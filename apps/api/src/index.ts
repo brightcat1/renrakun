@@ -679,6 +679,8 @@ app.get('/api/quota/status', async (c) => {
 })
 
 app.onError((error, c) => {
+  console.error('--- API Error ---');
+  console.error(error);
   if (error instanceof HTTPException) {
     const body: ApiError = {
       code: error.message || 'HTTP_ERROR',
@@ -1018,7 +1020,7 @@ async function checkJoinCreateActorLimit(
   if (!Number.isFinite(limit) || limit <= 0) return null
 
   const dayKey = getJstDayKey()
-  const actorKey = `join-create:${readActorIp(c.req.header)}`
+  const actorKey = `join-create:${readActorIp((name) => c.req.header(name))}`
 
   await c.env.DB.prepare(
     `
