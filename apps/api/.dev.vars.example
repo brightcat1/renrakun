@@ -1,4 +1,7 @@
 # Generate VAPID keys with:
 # npx web-push generate-vapid-keys --json
+# Local CORS origin for `wrangler dev`; overrides wrangler.toml vars in local dev.
+APP_ORIGIN=http://localhost:5173
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:your-email@example.com

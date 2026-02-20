@@ -1,14 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="renrakun icon">
-  <defs>
-    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffc447" />
-      <stop offset="100%" stop-color="#f57f3a" />
-    </linearGradient>
-  </defs>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#g1)" />
-  <rect x="52" y="62" width="152" height="132" rx="28" fill="#fff8ed" />
-  <circle cx="94" cy="128" r="14" fill="#0e5a62" />
-  <circle cx="128" cy="128" r="14" fill="#0e5a62" />
-  <circle cx="162" cy="128" r="14" fill="#0e5a62" />
-  <path d="M88 178h80" stroke="#0e5a62" stroke-width="12" stroke-linecap="round" />
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#ff8e72" />
+  <rect x="34" y="44" width="188" height="132" rx="30" fill="#fff7f2" />
+  <path
+    d="M74 98h18l14 38h66l16-30h-86"
+    stroke="#0b5f6a"
+    stroke-width="10"
+    fill="none"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <circle cx="112" cy="154" r="9" fill="#0b5f6a" />
+  <circle cx="172" cy="154" r="9" fill="#0b5f6a" />
+  <path d="M95 78h66" stroke="#ff8e72" stroke-width="10" stroke-linecap="round" />
+  <path d="M98 212c10 8 22 12 30 12s20-4 30-12" stroke="#0b5f6a" stroke-width="10" fill="none" stroke-linecap="round" />
+  <circle cx="98" cy="194" r="6" fill="#0b5f6a" />
+  <circle cx="158" cy="194" r="6" fill="#0b5f6a" />
 </svg>
