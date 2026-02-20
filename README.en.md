@@ -1,7 +1,5 @@
 # renrakun
 
-**🌐 App URL:** `https://renrakun.pages.dev`
-
 `renrakun` is a household restock messenger PWA focused on tap-only interactions.  
 It keeps shopping requests out of daily chat noise by using a dedicated ordering-style interface and inbox.
 
