@@ -83,6 +83,7 @@ npx wrangler secret put VAPID_SUBJECT
 - If `VAPID_SUBJECT` is stored as a Secret, you do not need to hardcode an email in `wrangler.toml`.
 - Request creation still works without `VAPID_*`, but Web Push delivery is skipped.
 - Completed request retention can be tuned with `COMPLETED_RETENTION_DAYS` (default: `30` days). Use `0` or below to disable auto-purge.
+- Daily maintenance also uses capped guardrails for free-tier protection: `MAINTENANCE_MAX_DELETE_PER_RUN` (default `2000`) and `MAINTENANCE_MAX_BATCHES_PER_RUN` (default `20`), while deletion criteria follow the `COMPLETED_RETENTION_DAYS` setting.
 
 ## Use As PWA (End Users)
 

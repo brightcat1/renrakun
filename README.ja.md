@@ -83,6 +83,7 @@ npx wrangler secret put VAPID_SUBJECT
 - `VAPID_SUBJECT` を Secret 登録していれば、`wrangler.toml` にメールアドレスを書く必要はありません。
 - `VAPID_*` が未設定でも依頼送信は動作しますが、Web Push は送信されません。
 - 完了済み依頼の保持期間は `COMPLETED_RETENTION_DAYS`（既定 `30` 日）で調整できます。`0` 以下で自動削除を無効化できます。
+- 日次メンテ処理には無料枠保護の上限もあり、`MAINTENANCE_MAX_DELETE_PER_RUN`（既定 `2000`）と `MAINTENANCE_MAX_BATCHES_PER_RUN`（既定 `20`）で1回実行あたりの処理量を制限します（※削除対象の判定は COMPLETED_RETENTION_DAYS の設定に従います）。
 
 ## PWAとして使う（利用者向け）
 

@@ -30,6 +30,8 @@ const PASSHASH_ITERATIONS = 120000
 const PASSHASH_SALT_BYTES = 16
 const PASSHASH_KEY_BYTES = 32
 const DEFAULT_COMPLETED_RETENTION_DAYS = 30
+const DEFAULT_MAINTENANCE_MAX_DELETE_PER_RUN = 2000
+const DEFAULT_MAINTENANCE_MAX_BATCHES_PER_RUN = 20
 const COMPLETED_PURGE_BATCH_SIZE = 200
 type CatalogLanguage = 'ja' | 'en'
 
@@ -1270,6 +1272,14 @@ function resolveCompletedRetentionDays(env: Env): number | null {
   return Math.floor(parsed)
 }
 
+function resolveMaintenanceLimit(raw: string | undefined, fallback: number): number {
+  const value = raw?.trim()
+  if (!value) return fallback
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(1, Math.floor(parsed))
+}
+
 function getCompletedCutoffIso(retentionDays: number): string {
   return new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
 }
@@ -1278,8 +1288,21 @@ async function purgeOldCompletedRequests(env: Env): Promise<void> {
   const retentionDays = resolveCompletedRetentionDays(env)
   if (!retentionDays) return
 
+  const maxDeletePerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_DELETE_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_DELETE_PER_RUN
+  )
+  const maxBatchesPerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_BATCHES_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_BATCHES_PER_RUN
+  )
   const cutoffIso = getCompletedCutoffIso(retentionDays)
+  let deletedCount = 0
+  let batchCount = 0
+
   while (true) {
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) return
+
     const rows = await env.DB.prepare(
       `
       SELECT id
@@ -1292,16 +1315,22 @@ async function purgeOldCompletedRequests(env: Env): Promise<void> {
     )
       .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
       .all<{ id: string }>()
+    batchCount += 1
 
     const ids = rows.results.map((row) => row.id)
     if (ids.length === 0) return
 
-    const placeholders = createInClause(ids.length)
-    await env.DB.prepare(`DELETE FROM requests WHERE id IN (${placeholders})`)
-      .bind(...ids)
-      .run()
+    const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
+    const availableIds = ids.slice(0, remainingDeleteBudget)
+    if (availableIds.length === 0) return
 
-    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) return
+    const placeholders = createInClause(availableIds.length)
+    await env.DB.prepare(`DELETE FROM requests WHERE id IN (${placeholders})`)
+      .bind(...availableIds)
+      .run()
+    deletedCount += availableIds.length
+
+    if (availableIds.length < ids.length || ids.length < COMPLETED_PURGE_BATCH_SIZE) return
   }
 }
 
@@ -1309,10 +1338,22 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
   const retentionDays = resolveCompletedRetentionDays(env)
   if (!retentionDays) return
 
+  const maxDeletePerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_DELETE_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_DELETE_PER_RUN
+  )
+  const maxBatchesPerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_BATCHES_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_BATCHES_PER_RUN
+  )
   const cutoffIso = getCompletedCutoffIso(retentionDays)
+  let deletedCount = 0
+  let batchCount = 0
 
   // Items first so tabs can be cleaned safely afterward.
   while (true) {
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) break
+
     const rows = await env.DB.prepare(
       `
       SELECT i.id
@@ -1331,19 +1372,27 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
     )
       .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
       .all<{ id: string }>()
+    batchCount += 1
 
     const ids = rows.results.map((row) => row.id)
     if (ids.length === 0) break
 
-    const placeholders = createInClause(ids.length)
-    await env.DB.prepare(`DELETE FROM items WHERE id IN (${placeholders})`)
-      .bind(...ids)
-      .run()
+    const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
+    const availableIds = ids.slice(0, remainingDeleteBudget)
+    if (availableIds.length === 0) break
 
-    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) break
+    const placeholders = createInClause(availableIds.length)
+    await env.DB.prepare(`DELETE FROM items WHERE id IN (${placeholders})`)
+      .bind(...availableIds)
+      .run()
+    deletedCount += availableIds.length
+
+    if (availableIds.length < ids.length || ids.length < COMPLETED_PURGE_BATCH_SIZE) break
   }
 
   while (true) {
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) return
+
     const rows = await env.DB.prepare(
       `
       SELECT t.id
@@ -1362,16 +1411,22 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
     )
       .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
       .all<{ id: string }>()
+    batchCount += 1
 
     const ids = rows.results.map((row) => row.id)
     if (ids.length === 0) return
 
-    const placeholders = createInClause(ids.length)
-    await env.DB.prepare(`DELETE FROM tabs WHERE id IN (${placeholders})`)
-      .bind(...ids)
-      .run()
+    const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
+    const availableIds = ids.slice(0, remainingDeleteBudget)
+    if (availableIds.length === 0) return
 
-    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) return
+    const placeholders = createInClause(availableIds.length)
+    await env.DB.prepare(`DELETE FROM tabs WHERE id IN (${placeholders})`)
+      .bind(...availableIds)
+      .run()
+    deletedCount += availableIds.length
+
+    if (availableIds.length < ids.length || ids.length < COMPLETED_PURGE_BATCH_SIZE) return
   }
 }
 
