@@ -1305,11 +1305,86 @@ async function purgeOldCompletedRequests(env: Env): Promise<void> {
   }
 }
 
+async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
+  const retentionDays = resolveCompletedRetentionDays(env)
+  if (!retentionDays) return
+
+  const cutoffIso = getCompletedCutoffIso(retentionDays)
+
+  // Items first so tabs can be cleaned safely afterward.
+  while (true) {
+    const rows = await env.DB.prepare(
+      `
+      SELECT i.id
+      FROM items i
+      WHERE i.is_system = 0
+        AND i.archived_at IS NOT NULL
+        AND i.archived_at < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM request_items ri
+          WHERE ri.item_id = i.id
+        )
+      ORDER BY i.archived_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
+      .all<{ id: string }>()
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) break
+
+    const placeholders = createInClause(ids.length)
+    await env.DB.prepare(`DELETE FROM items WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .run()
+
+    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) break
+  }
+
+  while (true) {
+    const rows = await env.DB.prepare(
+      `
+      SELECT t.id
+      FROM tabs t
+      WHERE t.is_system = 0
+        AND t.archived_at IS NOT NULL
+        AND t.archived_at < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM items i
+          WHERE i.tab_id = t.id
+        )
+      ORDER BY t.archived_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
+      .all<{ id: string }>()
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) return
+
+    const placeholders = createInClause(ids.length)
+    await env.DB.prepare(`DELETE FROM tabs WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .run()
+
+    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) return
+  }
+}
+
+async function runDailyMaintenance(env: Env): Promise<void> {
+  await purgeOldCompletedRequests(env)
+  await purgeArchivedCustomCatalog(env)
+}
+
 const worker = {
   fetch: app.fetch,
   scheduled: async (_event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
     ctx.waitUntil(
-      Promise.allSettled([resetDailyQuota(env), purgeOldCompletedRequests(env)]).then(() => undefined)
+      Promise.allSettled([resetDailyQuota(env), runDailyMaintenance(env)]).then(() => undefined)
     )
   }
 }
