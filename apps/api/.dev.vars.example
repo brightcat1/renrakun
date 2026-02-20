@@ -1,0 +1,4 @@
+# Generate VAPID keys with:
+# npx web-push generate-vapid-keys --json
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

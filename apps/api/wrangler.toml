@@ -1,0 +1,24 @@
+name = "renrakun-api"
+main = "src/index.ts"
+compatibility_date = "2026-02-20"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "renrakun"
+database_id = "cdece3cf-17c5-4737-ad26-757ab31f3c03"
+migrations_dir = "migrations"
+
+[durable_objects]
+bindings = [{ name = "QUOTA_GATE", class_name = "QuotaGateDO" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuotaGateDO"]
+
+[triggers]
+crons = ["0 15 * * *"]
+
+[vars]
+APP_ORIGIN = "http://localhost:5173"
+DAILY_WRITE_LIMIT = "300"
+DAILY_JOIN_CREATE_LIMIT_PER_ACTOR = "40"

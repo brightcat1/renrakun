@@ -1,0 +1,36 @@
+node_modules/
+.pnpm-store/
+
+# Build artifacts
+dist/
+coverage/
+*.tsbuildinfo
+
+# Cloudflare local state
+.wrangler/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (keep examples)
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+!.env.example
+!**/.env.example
+!.dev.vars.example
+!**/.dev.vars.example
+
+# Vite
+*.local
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
