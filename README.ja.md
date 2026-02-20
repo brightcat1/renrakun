@@ -50,6 +50,8 @@ cd apps/api
 pnpm wrangler d1 migrations apply renrakun --local
 ```
 
+`--local` は Cloudflare の本番D1ではなく、ローカルの `.wrangler/state` 配下にある D1 へ適用されます。
+
 4. 開発サーバーの起動:
 
 ```bash
@@ -60,12 +62,32 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-5. 本番DBの初期化（初回のみ）:
+## 本番セットアップ（初回 + スキーマ変更時）
+
+1. 本番DBへマイグレーション適用（初回および構造変更時）:
 
 ```bash
 cd apps/api
 pnpm wrangler d1 migrations apply renrakun --remote
 ```
+
+2. Push通知の機密値を Cloudflare Secrets に登録:
+
+```bash
+cd apps/api
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_SUBJECT
+```
+
+- `VAPID_SUBJECT` を Secret 登録していれば、`wrangler.toml` にメールアドレスを書く必要はありません。
+- `VAPID_*` が未設定でも依頼送信は動作しますが、Web Push は送信されません。
+
+## PWAとして使う（利用者向け）
+
+1. iPhone (Safari): 公開URLを開く -> 共有 -> `ホーム画面に追加`
+2. Android (Chrome): 公開URLを開く -> メニュー -> `ホーム画面に追加`
+3. 初回起動後、アプリ内の通知有効化ボタンを押して許可
 
 ## CI/CD とデプロイ
 
@@ -88,8 +110,8 @@ pnpm wrangler d1 migrations apply renrakun --remote
 - 未対応の依頼が可視化される
 - 家庭内運用に特化した固定のカタログとUI
 
-## 免責と制約
+## 仕様・制限事項
 
-- iOS PWA の Push は OS バージョンや通知許可設定の影響を受けます
-- 無料枠設計のため、書き込み系 API は日次上限に達すると停止します
-- 本 MVP には価格比較・在庫連携・EC 連携は含まれません
+- **Push通知**: iOS環境ではOSバージョンやホーム画面への追加状況、通知許可設定により、通知が利用できない場合があります。
+- **書き込み制限**: Cloudflareの無料枠内で運用するため、書き込み系APIは日次上限に達すると制限がかかります（翌日 0:00 JST に自動復帰）。
+- **スコープ**: 本MVP版には、価格比較・在庫管理・外部EC連携などの機能は含まれていません。

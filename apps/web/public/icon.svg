@@ -1,16 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="renrakun icon">
   <rect x="8" y="8" width="240" height="240" rx="56" fill="#ff8e72" />
   <rect x="34" y="44" width="188" height="132" rx="30" fill="#fff7f2" />
-  <path
-    d="M74 98h18l14 38h66l16-30h-86"
-    stroke="#0b5f6a"
-    stroke-width="10"
-    fill="none"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
-  <circle cx="112" cy="154" r="9" fill="#0b5f6a" />
-  <circle cx="172" cy="154" r="9" fill="#0b5f6a" />
+  <path d="M88 92h80" stroke="#0b5f6a" stroke-width="10" stroke-linecap="round" />
+  <path d="M84 104h88l-10 30H94z" fill="none" stroke="#0b5f6a" stroke-width="10" stroke-linejoin="round" />
+  <circle cx="106" cy="148" r="9" fill="#0b5f6a" />
+  <circle cx="150" cy="148" r="9" fill="#0b5f6a" />
   <path d="M95 78h66" stroke="#ff8e72" stroke-width="10" stroke-linecap="round" />
   <path d="M98 212c10 8 22 12 30 12s20-4 30-12" stroke="#0b5f6a" stroke-width="10" fill="none" stroke-linecap="round" />
   <circle cx="98" cy="194" r="6" fill="#0b5f6a" />

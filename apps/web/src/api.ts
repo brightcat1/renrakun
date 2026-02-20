@@ -12,10 +12,16 @@ import type {
 } from '@renrakun/shared'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8787'
+export type ApiLanguage = 'ja' | 'en'
+let apiLanguage: ApiLanguage = 'ja'
 
 export interface SessionAuth {
   deviceId: string
   memberId: string
+}
+
+export function setApiLanguage(lang: ApiLanguage): void {
+  apiLanguage = lang
 }
 
 export class ApiClientError extends Error {
@@ -42,7 +48,8 @@ async function apiFetch<T>(
   } = {}
 ): Promise<T> {
   const headers: HeadersInit = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'x-app-lang': apiLanguage
   }
 
   if (options.auth) {
@@ -121,6 +128,20 @@ export function createCustomItem(
     method: 'POST',
     auth,
     body: input
+  })
+}
+
+export function deleteCustomTab(groupId: string, tabId: string, auth: SessionAuth): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/groups/${groupId}/custom-tabs/${tabId}/delete`, {
+    method: 'POST',
+    auth
+  })
+}
+
+export function deleteCustomItem(groupId: string, itemId: string, auth: SessionAuth): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/groups/${groupId}/custom-items/${itemId}/delete`, {
+    method: 'POST',
+    auth
   })
 }
 

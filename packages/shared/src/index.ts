@@ -105,6 +105,7 @@ export interface InboxEvent {
   eventId: string
   requestId: string
   status: RequestStatus
+  senderMemberId: string
   senderName: string
   storeName: string | null
   items: Array<{ name: string; qty: number }>
@@ -120,81 +121,81 @@ export interface QuotaResponse {
 }
 
 export const SYSTEM_TABS: Array<Omit<CatalogTab, 'groupId'>> = [
-  { id: 'sys-tab-detergent', name: '洗剤', isSystem: true, sortOrder: 10 },
-  { id: 'sys-tab-washroom', name: '洗面', isSystem: true, sortOrder: 20 },
-  { id: 'sys-tab-beauty', name: '美容', isSystem: true, sortOrder: 30 },
-  { id: 'sys-tab-kitchen', name: 'キッチン', isSystem: true, sortOrder: 40 },
-  { id: 'sys-tab-store', name: '店舗依頼', isSystem: true, sortOrder: 50 }
+  { id: 'sys-tab-detergent', name: 'Detergent', isSystem: true, sortOrder: 10 },
+  { id: 'sys-tab-washroom', name: 'Washroom', isSystem: true, sortOrder: 20 },
+  { id: 'sys-tab-beauty', name: 'Beauty', isSystem: true, sortOrder: 30 },
+  { id: 'sys-tab-kitchen', name: 'Kitchen', isSystem: true, sortOrder: 40 },
+  { id: 'sys-tab-store', name: 'Shopping Notes', isSystem: true, sortOrder: 50 }
 ]
 
 export const SYSTEM_ITEMS: CatalogItem[] = [
   {
     id: 'sys-item-detergent',
     tabId: 'sys-tab-detergent',
-    name: '洗剤',
+    name: 'Detergent',
     isSystem: true,
     sortOrder: 10
   },
   {
     id: 'sys-item-refill',
     tabId: 'sys-tab-detergent',
-    name: '詰替え',
+    name: 'Refill',
     isSystem: true,
     sortOrder: 20
   },
   {
     id: 'sys-item-tissue',
     tabId: 'sys-tab-washroom',
-    name: 'ティッシュ',
+    name: 'Tissue',
     isSystem: true,
     sortOrder: 10
   },
   {
     id: 'sys-item-toilet-paper',
     tabId: 'sys-tab-washroom',
-    name: 'トイレットペーパー',
+    name: 'Toilet Paper',
     isSystem: true,
     sortOrder: 20
   },
   {
     id: 'sys-item-hand-paper',
     tabId: 'sys-tab-washroom',
-    name: 'ハンドペーパー',
+    name: 'Hand Paper',
     isSystem: true,
     sortOrder: 30
   },
   {
     id: 'sys-item-cotton',
     tabId: 'sys-tab-beauty',
-    name: 'コットン',
+    name: 'Cotton',
     isSystem: true,
     sortOrder: 10
   },
   {
     id: 'sys-item-shampoo',
     tabId: 'sys-tab-beauty',
-    name: 'シャンプー',
+    name: 'Shampoo',
     isSystem: true,
     sortOrder: 20
   },
   {
     id: 'sys-item-conditioner',
     tabId: 'sys-tab-beauty',
-    name: 'リンス',
+    name: 'Conditioner',
     isSystem: true,
     sortOrder: 30
   },
   {
     id: 'sys-item-kitchen-paper',
     tabId: 'sys-tab-kitchen',
-    name: 'キッチンペーパー',
+    name: 'Kitchen Paper',
     isSystem: true,
     sortOrder: 10
   },
   {
     id: 'sys-item-carrot',
     tabId: 'sys-tab-store',
-    name: 'にんじん',
+    name: 'Carrot',
     isSystem: true,
     sortOrder: 10
   }
@@ -204,14 +205,14 @@ export const SYSTEM_STORES: StoreButton[] = [
   {
     id: 'sys-store-summit',
     groupId: null,
-    name: 'サミット',
+    name: 'Summit',
     isSystem: true,
     sortOrder: 10
   },
   {
     id: 'sys-store-nitori',
     groupId: null,
-    name: 'ニトリ',
+    name: 'Nitori',
     isSystem: true,
     sortOrder: 20
   },
@@ -225,14 +226,14 @@ export const SYSTEM_STORES: StoreButton[] = [
   {
     id: 'sys-store-aeon',
     groupId: null,
-    name: 'イオン',
+    name: 'AEON',
     isSystem: true,
     sortOrder: 40
   },
   {
     id: 'sys-store-gyomu',
     groupId: null,
-    name: '業務スーパー',
+    name: 'Wholesale Market',
     isSystem: true,
     sortOrder: 50
   }

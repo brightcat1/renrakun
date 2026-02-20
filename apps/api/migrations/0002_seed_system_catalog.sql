@@ -4,7 +4,7 @@ VALUES
   ('sys-tab-washroom', NULL, '洗面', 1, 20),
   ('sys-tab-beauty', NULL, '美容', 1, 30),
   ('sys-tab-kitchen', NULL, 'キッチン', 1, 40),
-  ('sys-tab-store', NULL, '店舗依頼', 1, 50);
+  ('sys-tab-store', NULL, '買い物メモ', 1, 50);
 
 INSERT OR IGNORE INTO items (id, tab_id, name, is_system, sort_order)
 VALUES

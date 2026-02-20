@@ -46,7 +46,9 @@ export interface DbRequestRow {
   eventId: string
   requestId: string
   status: RequestStatus
+  senderMemberId: string
   senderName: string
+  storeId: string | null
   storeName: string | null
   createdAt: string
   readAt: string | null
@@ -54,6 +56,7 @@ export interface DbRequestRow {
 
 export interface DbRequestItemRow {
   requestId: string
+  itemId: string
   name: string
   qty: number
 }

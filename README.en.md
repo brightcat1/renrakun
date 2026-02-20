@@ -50,6 +50,8 @@ cd apps/api
 pnpm wrangler d1 migrations apply renrakun --local
 ```
 
+`--local` applies to local D1 state under `.wrangler/state`, not to Cloudflare production D1.
+
 4. Run development servers:
 
 ```bash
@@ -60,12 +62,32 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-5. Production DB initialization (one-time):
+## Production Setup (Initial + Schema Updates)
+
+1. Apply migrations to production D1 (initial setup and whenever schema changes):
 
 ```bash
 cd apps/api
 pnpm wrangler d1 migrations apply renrakun --remote
 ```
+
+2. Register push secrets in Cloudflare:
+
+```bash
+cd apps/api
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_SUBJECT
+```
+
+- If `VAPID_SUBJECT` is stored as a Secret, you do not need to hardcode an email in `wrangler.toml`.
+- Request creation still works without `VAPID_*`, but Web Push delivery is skipped.
+
+## Use As PWA (End Users)
+
+1. iPhone (Safari): open app URL -> Share -> `Add to Home Screen`
+2. Android (Chrome): open app URL -> menu -> `Add to Home Screen`
+3. After install, tap the in-app Enable Notifications button and allow notifications
 
 ## CI/CD & Deployment
 
@@ -88,8 +110,8 @@ This repository implements an automated CI/CD pipeline using GitHub Actions and 
 - Visible outstanding requests and status transitions.
 - Household-oriented default catalog and quick buttons.
 
-## Limitations
+## Specifications & Limitations
 
-- PWA push support depends on browser/OS permission policies.
-- Write endpoints will pause after the daily free-tier quota is exceeded.
-- No price/inventory/commerce integrations in this MVP.
+- **Push notifications**: On iOS, Web Push availability depends on OS version, Home Screen installation status, and notification permission settings.
+- **Write limits**: To stay within Cloudflare free-tier limits, write APIs are rate-limited after the daily cap is reached (auto-resets at 00:00 JST).
+- **Scope**: This MVP does not include features such as price comparison, inventory management, or external e-commerce integrations.
