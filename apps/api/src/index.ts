@@ -29,6 +29,8 @@ const PASSHASH_PREFIX = 'pbkdf2_sha256'
 const PASSHASH_ITERATIONS = 120000
 const PASSHASH_SALT_BYTES = 16
 const PASSHASH_KEY_BYTES = 32
+const DEFAULT_COMPLETED_RETENTION_DAYS = 30
+const COMPLETED_PURGE_BATCH_SIZE = 200
 type CatalogLanguage = 'ja' | 'en'
 
 const SYSTEM_TAB_LABELS: Record<string, Record<CatalogLanguage, string>> = {
@@ -1260,10 +1262,55 @@ async function resetDailyQuota(env: Env): Promise<void> {
   })
 }
 
+function resolveCompletedRetentionDays(env: Env): number | null {
+  const raw = env.COMPLETED_RETENTION_DAYS?.trim()
+  if (!raw) return DEFAULT_COMPLETED_RETENTION_DAYS
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return Math.floor(parsed)
+}
+
+function getCompletedCutoffIso(retentionDays: number): string {
+  return new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+}
+
+async function purgeOldCompletedRequests(env: Env): Promise<void> {
+  const retentionDays = resolveCompletedRetentionDays(env)
+  if (!retentionDays) return
+
+  const cutoffIso = getCompletedCutoffIso(retentionDays)
+  while (true) {
+    const rows = await env.DB.prepare(
+      `
+      SELECT id
+      FROM requests
+      WHERE status = 'completed'
+        AND created_at < ?
+      ORDER BY created_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
+      .all<{ id: string }>()
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) return
+
+    const placeholders = createInClause(ids.length)
+    await env.DB.prepare(`DELETE FROM requests WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .run()
+
+    if (ids.length < COMPLETED_PURGE_BATCH_SIZE) return
+  }
+}
+
 const worker = {
   fetch: app.fetch,
   scheduled: async (_event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
-    ctx.waitUntil(resetDailyQuota(env))
+    ctx.waitUntil(
+      Promise.allSettled([resetDailyQuota(env), purgeOldCompletedRequests(env)]).then(() => undefined)
+    )
   }
 }
 

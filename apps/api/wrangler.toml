@@ -22,3 +22,4 @@ crons = ["0 15 * * *"]
 APP_ORIGIN = "https://renrakun.pages.dev"
 DAILY_WRITE_LIMIT = "300"
 DAILY_JOIN_CREATE_LIMIT_PER_ACTOR = "40"
+COMPLETED_RETENTION_DAYS = "30"

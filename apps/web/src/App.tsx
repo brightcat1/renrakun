@@ -942,211 +942,215 @@ export default function App() {
       )}
 
       <div className="main-grid">
-        <section className="card touch-card">
-          <div className="tab-strip">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={activeTabId === tab.id ? 'active' : ''}
-                onClick={() => {
-                  setActiveTabId(tab.id)
-                  setCustomItemTabId(tab.id)
-                }}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="item-grid">
-            {activeItems.map((item) => (
-              <button key={item.id} type="button" className="item-button" onClick={() => handleAddToCart(item.id)}>
-                <span>{item.name}</span>
-                <small>+1</small>
-              </button>
-            ))}
-          </div>
-
-          <div className="store-row">
-            {storeButtons.map((store) => (
-              <button
-                key={store.id}
-                type="button"
-                className={selectedStoreId === store.id ? 'selected' : ''}
-                onClick={() => setSelectedStoreId((current) => (current === store.id ? undefined : store.id))}
-              >
-                {store.name}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="card inbox-card">
-          <div className="panel-header">
-            <h2>{messages.inboxTitle}</h2>
-            <div className="panel-controls">
-              <div className="inbox-filter" role="group" aria-label={messages.inboxTitle}>
+        <div className="main-left">
+          <section className="card touch-card">
+            <div className="tab-strip">
+              {tabs.map((tab) => (
                 <button
+                  key={tab.id}
                   type="button"
-                  className={inboxFilter === 'open' ? 'active' : ''}
-                  onClick={() => setInboxFilter('open')}
+                  className={activeTabId === tab.id ? 'active' : ''}
+                  onClick={() => {
+                    setActiveTabId(tab.id)
+                    setCustomItemTabId(tab.id)
+                  }}
                 >
-                  {messages.inboxFilterOpen}
+                  {tab.name}
                 </button>
-                <button
-                  type="button"
-                  className={inboxFilter === 'all' ? 'active' : ''}
-                  onClick={() => setInboxFilter('all')}
-                >
-                  {messages.inboxFilterAll}
-                </button>
-              </div>
-              <button type="button" onClick={() => void loadPrivateData()} disabled={isLoading}>
-                {messages.refresh}
-              </button>
+              ))}
             </div>
-          </div>
-          <ul className="inbox-list">
-            {visibleInbox.length === 0 && <li className="empty">{messages.inboxEmpty}</li>}
-            {visibleInbox.map((event) => {
-              const isOwnRequest = event.senderMemberId === session.memberId
-              const actorLabel = isOwnRequest ? messages.selfLabel : event.senderName
-              const prefix = language === 'ja' ? `${actorLabel}が` : `${actorLabel} `
-              const storePrefix = event.storeName
-                ? language === 'ja'
-                  ? `${event.storeName}で`
-                  : `at ${event.storeName} `
-                : ''
-              const itemText = event.items
-                .map((item) => (item.qty > 1 ? `${item.name} x${item.qty}` : item.name))
-                .join(language === 'ja' ? '、' : ', ')
-              return (
-                <li key={event.eventId} className="inbox-item">
-                  <div className="inbox-top">
-                    <strong>{actorLabel}</strong>
-                    <span className={`status ${event.status}`}>{formatStatus(event.status, messages)}</span>
-                  </div>
-                  <p className="inbox-message">
-                    {prefix}
-                    {storePrefix}
-                    {itemText}
-                    {isOwnRequest ? messages.requestOwnSuffix : messages.requestOtherSuffix}
-                  </p>
-                  <div className="inbox-meta">{formatTime(event.createdAt, messages.locale)}</div>
-                  <div className="inbox-actions">
-                    <button
-                      type="button"
-                      disabled={event.status !== 'requested' || isOwnRequest}
-                      onClick={() => void handleAck(event.requestId)}
-                    >
-                      {messages.ack}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={event.status === 'completed' || isOwnRequest}
-                      onClick={() => void handleComplete(event.requestId)}
-                    >
-                      {messages.complete}
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
 
-        {session.role === 'admin' && (
-          <section className="card admin-card">
-            <h2>{messages.adminTitle}</h2>
-            <p>{messages.adminLead}</p>
-            <div className="admin-form">
-              <label>
-                {messages.newTab}
-                <input
-                  value={customTabName}
-                  onChange={(event) => setCustomTabName(event.target.value)}
-                  placeholder={messages.newTabPlaceholder}
-                  maxLength={30}
-                />
-              </label>
-              <button type="button" className="admin-action-button" onClick={() => void handleCreateCustomTab()}>
-                {messages.addTab}
-              </button>
+            <div className="item-grid">
+              {activeItems.map((item) => (
+                <button key={item.id} type="button" className="item-button" onClick={() => handleAddToCart(item.id)}>
+                  <span>{item.name}</span>
+                  <small>+1</small>
+                </button>
+              ))}
             </div>
-            <div className="admin-form">
-              <label>
-                {messages.itemTargetTab}
-                <select value={customItemTabId} onChange={(event) => setCustomItemTabId(event.target.value)}>
-                  {tabs.map((tab) => (
-                    <option key={tab.id} value={tab.id}>
-                      {tab.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {messages.newItem}
-                <input
-                  value={customItemName}
-                  onChange={(event) => setCustomItemName(event.target.value)}
-                  placeholder={messages.newItemPlaceholder}
-                  maxLength={30}
-                />
-              </label>
-              <button
-                type="button"
-                className="admin-action-button"
-                onClick={() => void handleCreateCustomItem()}
-                disabled={!customItemName.trim() || !customItemTabId}
-              >
-                {messages.addItem}
-              </button>
-            </div>
-            <div className="admin-form">
-              <h3>{messages.customTabsSection}</h3>
-              {customTabs.length === 0 ? (
-                <p className="empty">{messages.noCustomTabs}</p>
-              ) : (
-                <ul className="admin-list">
-                  {customTabs.map((tab) => (
-                    <li key={tab.id}>
-                      <span>{tab.name}</span>
-                      <button
-                        type="button"
-                        className="danger-button"
-                        onClick={() => openDeleteModal('tab', tab)}
-                      >
-                        {messages.deleteAction}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="admin-form">
-              <h3>{messages.customItemsSection}</h3>
-              {customItemsInSelectedTab.length === 0 ? (
-                <p className="empty">{messages.noCustomItems}</p>
-              ) : (
-                <ul className="admin-list">
-                  {customItemsInSelectedTab.map((item) => (
-                    <li key={item.id}>
-                      <span>{item.name}</span>
-                      <button
-                        type="button"
-                        className="danger-button"
-                        onClick={() => openDeleteModal('item', item)}
-                      >
-                        {messages.deleteAction}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+
+            <div className="store-row">
+              {storeButtons.map((store) => (
+                <button
+                  key={store.id}
+                  type="button"
+                  className={selectedStoreId === store.id ? 'selected' : ''}
+                  onClick={() => setSelectedStoreId((current) => (current === store.id ? undefined : store.id))}
+                >
+                  {store.name}
+                </button>
+              ))}
             </div>
           </section>
-        )}
+
+          {session.role === 'admin' && (
+            <section className="card admin-card">
+              <h2>{messages.adminTitle}</h2>
+              <p>{messages.adminLead}</p>
+              <div className="admin-form">
+                <label>
+                  {messages.newTab}
+                  <input
+                    value={customTabName}
+                    onChange={(event) => setCustomTabName(event.target.value)}
+                    placeholder={messages.newTabPlaceholder}
+                    maxLength={30}
+                  />
+                </label>
+                <button type="button" className="admin-action-button" onClick={() => void handleCreateCustomTab()}>
+                  {messages.addTab}
+                </button>
+              </div>
+              <div className="admin-form">
+                <label>
+                  {messages.itemTargetTab}
+                  <select value={customItemTabId} onChange={(event) => setCustomItemTabId(event.target.value)}>
+                    {tabs.map((tab) => (
+                      <option key={tab.id} value={tab.id}>
+                        {tab.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  {messages.newItem}
+                  <input
+                    value={customItemName}
+                    onChange={(event) => setCustomItemName(event.target.value)}
+                    placeholder={messages.newItemPlaceholder}
+                    maxLength={30}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="admin-action-button"
+                  onClick={() => void handleCreateCustomItem()}
+                  disabled={!customItemName.trim() || !customItemTabId}
+                >
+                  {messages.addItem}
+                </button>
+              </div>
+              <div className="admin-form">
+                <h3>{messages.customTabsSection}</h3>
+                {customTabs.length === 0 ? (
+                  <p className="empty">{messages.noCustomTabs}</p>
+                ) : (
+                  <ul className="admin-list">
+                    {customTabs.map((tab) => (
+                      <li key={tab.id}>
+                        <span>{tab.name}</span>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => openDeleteModal('tab', tab)}
+                        >
+                          {messages.deleteAction}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="admin-form">
+                <h3>{messages.customItemsSection}</h3>
+                {customItemsInSelectedTab.length === 0 ? (
+                  <p className="empty">{messages.noCustomItems}</p>
+                ) : (
+                  <ul className="admin-list">
+                    {customItemsInSelectedTab.map((item) => (
+                      <li key={item.id}>
+                        <span>{item.name}</span>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => openDeleteModal('item', item)}
+                        >
+                          {messages.deleteAction}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <div className="main-right">
+          <section className="card inbox-card">
+            <div className="panel-header">
+              <h2>{messages.inboxTitle}</h2>
+              <div className="panel-controls">
+                <div className="inbox-filter" role="group" aria-label={messages.inboxTitle}>
+                  <button
+                    type="button"
+                    className={inboxFilter === 'open' ? 'active' : ''}
+                    onClick={() => setInboxFilter('open')}
+                  >
+                    {messages.inboxFilterOpen}
+                  </button>
+                  <button
+                    type="button"
+                    className={inboxFilter === 'all' ? 'active' : ''}
+                    onClick={() => setInboxFilter('all')}
+                  >
+                    {messages.inboxFilterAll}
+                  </button>
+                </div>
+                <button type="button" onClick={() => void loadPrivateData()} disabled={isLoading}>
+                  {messages.refresh}
+                </button>
+              </div>
+            </div>
+            <ul className="inbox-list">
+              {visibleInbox.length === 0 && <li className="empty">{messages.inboxEmpty}</li>}
+              {visibleInbox.map((event) => {
+                const isOwnRequest = event.senderMemberId === session.memberId
+                const actorLabel = isOwnRequest ? messages.selfLabel : event.senderName
+                const prefix = language === 'ja' ? `${actorLabel}が` : `${actorLabel} `
+                const storePrefix = event.storeName
+                  ? language === 'ja'
+                    ? `${event.storeName}で`
+                    : `at ${event.storeName} `
+                  : ''
+                const itemText = event.items
+                  .map((item) => (item.qty > 1 ? `${item.name} x${item.qty}` : item.name))
+                  .join(language === 'ja' ? '、' : ', ')
+                return (
+                  <li key={event.eventId} className="inbox-item">
+                    <div className="inbox-top">
+                      <strong>{actorLabel}</strong>
+                      <span className={`status ${event.status}`}>{formatStatus(event.status, messages)}</span>
+                    </div>
+                    <p className="inbox-message">
+                      {prefix}
+                      {storePrefix}
+                      {itemText}
+                      {isOwnRequest ? messages.requestOwnSuffix : messages.requestOtherSuffix}
+                    </p>
+                    <div className="inbox-meta">{formatTime(event.createdAt, messages.locale)}</div>
+                    <div className="inbox-actions">
+                      <button
+                        type="button"
+                        disabled={event.status !== 'requested' || isOwnRequest}
+                        onClick={() => void handleAck(event.requestId)}
+                      >
+                        {messages.ack}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={event.status === 'completed' || isOwnRequest}
+                        onClick={() => void handleComplete(event.requestId)}
+                      >
+                        {messages.complete}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        </div>
       </div>
 
       <footer className="cart-bar">

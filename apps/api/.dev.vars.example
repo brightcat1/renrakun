@@ -5,3 +5,5 @@ APP_ORIGIN=http://localhost:5173
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:your-email@example.com
+# Completed requests older than this (days) are purged by daily cron. Set 0 to disable.
+COMPLETED_RETENTION_DAYS=30

@@ -82,6 +82,7 @@ npx wrangler secret put VAPID_SUBJECT
 
 - If `VAPID_SUBJECT` is stored as a Secret, you do not need to hardcode an email in `wrangler.toml`.
 - Request creation still works without `VAPID_*`, but Web Push delivery is skipped.
+- Completed request retention can be tuned with `COMPLETED_RETENTION_DAYS` (default: `30` days). Use `0` or below to disable auto-purge.
 
 ## Use As PWA (End Users)
 
@@ -114,4 +115,5 @@ This repository implements an automated CI/CD pipeline using GitHub Actions and 
 
 - **Push notifications**: On iOS, Web Push availability depends on OS version, Home Screen installation status, and notification permission settings.
 - **Write limits**: To stay within Cloudflare free-tier limits, write APIs are rate-limited after the daily cap is reached (auto-resets at 00:00 JST).
+- **History cleanup**: Completed requests are auto-purged after 30 days by default (`COMPLETED_RETENTION_DAYS` can override this).
 - **Scope**: This MVP does not include features such as price comparison, inventory management, or external e-commerce integrations.

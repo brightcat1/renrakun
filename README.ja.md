@@ -82,6 +82,7 @@ npx wrangler secret put VAPID_SUBJECT
 
 - `VAPID_SUBJECT` を Secret 登録していれば、`wrangler.toml` にメールアドレスを書く必要はありません。
 - `VAPID_*` が未設定でも依頼送信は動作しますが、Web Push は送信されません。
+- 完了済み依頼の保持期間は `COMPLETED_RETENTION_DAYS`（既定 `30` 日）で調整できます。`0` 以下で自動削除を無効化できます。
 
 ## PWAとして使う（利用者向け）
 
@@ -114,4 +115,5 @@ npx wrangler secret put VAPID_SUBJECT
 
 - **Push通知**: iOS環境ではOSバージョンやホーム画面への追加状況、通知許可設定により、通知が利用できない場合があります。
 - **書き込み制限**: Cloudflareの無料枠内で運用するため、書き込み系APIは日次上限に達すると制限がかかります（翌日 0:00 JST に自動復帰）。
+- **履歴の自動整理**: 完了済み（`completed`）依頼は既定で30日後に自動削除されます（`COMPLETED_RETENTION_DAYS` で変更可）。
 - **スコープ**: 本MVP版には、価格比較・在庫管理・外部EC連携などの機能は含まれていません。

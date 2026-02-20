@@ -5,6 +5,7 @@ export interface Env {
   QUOTA_GATE: DurableObjectNamespace
   DAILY_WRITE_LIMIT?: string
   DAILY_JOIN_CREATE_LIMIT_PER_ACTOR?: string
+  COMPLETED_RETENTION_DAYS?: string
   APP_ORIGIN: string
   VAPID_PUBLIC_KEY?: string
   VAPID_PRIVATE_KEY?: string
