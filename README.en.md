@@ -13,7 +13,51 @@ It keeps shopping requests out of daily chat noise by using a dedicated ordering
 
 ## Architecture & Tech Stack
 
-This project separates the frontend and backend, leveraging edge computing:
+This application is built on a Cloudflare-native serverless architecture, combining a React frontend with a Workers/D1 API:
+
+```mermaid
+graph TD
+    subgraph Client ["📱 Client (Browser / PWA)"]
+        UI["React Web App<br/>(Vite)"]
+        LS[("LocalStorage<br/>(Session / UUID)")]
+        SW["Service Worker<br/>(Web Push)"]
+    end
+
+    subgraph Cloudflare ["☁️ Cloudflare Edge Network"]
+        API["Workers (Hono)<br/>API Server"]
+        DO[("Durable Objects<br/>(QuotaGateDO)")]
+        DB[("D1 (SQLite)<br/>Relational Database")]
+        CRON(("Cron Triggers<br/>(Scheduled Events)"))
+    end
+
+    subgraph External ["🌐 External Services"]
+        PushService["Push Provider<br/>(Apple / Google / Mozilla)"]
+    end
+
+    %% Client Interactions
+    UI -- "1. Read/Write Keys" --> LS
+    UI -- "2. REST API (HTTPS)" --> API
+    
+    %% Backend Interactions
+    API -- "3. Query / Mutate" --> DB
+    API -- "4. Check Limit" --> DO
+    CRON -- "5. Daily GC & Quota Reset" --> API
+    
+    %% Push Notification Flow
+    API -- "6. Web Push Protocol" --> PushService
+    PushService -. "7. Deliver Notification" .-> SW
+    SW -. "8. Show Alert" .-> UI
+
+    classDef cf fill:#f38020,stroke:#d36000,stroke-width:2px,color:white;
+    classDef client fill:#00a4d3,stroke:#007b9f,stroke-width:2px,color:white;
+    classDef ext fill:#6c757d,stroke:#495057,stroke-width:2px,color:white;
+    classDef db fill:#0051c3,stroke:#003a8c,stroke-width:2px,color:white;
+
+    class API,CRON cf;
+    class DB,DO db;
+    class UI,LS,SW client;
+    class PushService ext;
+```
 
 - **Web (Frontend):** React + TypeScript + Vite + `vite-plugin-pwa`. Delivered globally via Cloudflare Pages.
 - **API (Backend):** Cloudflare Workers (Hono) + D1 (SQLite-based Edge DB).
