@@ -25,15 +25,14 @@ graph TD
   subgraph Client["Client (Browser / PWA)"]
     UI["Web App\n(React + Vite PWA)"]
     SW["Service Worker"]
-    LS[("LocalStorage\n(session/device)")]
+    LS[("LocalStorage\n(Session/Device)")]
   end
 
   subgraph Edge["Cloudflare Edge"]
     API["Workers API\n(Hono)"]
     DO[("Durable Object\nQuotaGate")]
-    DB[("D1 (SQLite)")]
-    Q[("push_notifications queue")]
-    CRON["Cron Trigger\n(daily maintenance)"]
+    DB[("D1 Database")]
+    CRON["Cron Trigger\n(Daily Maintenance)"]
   end
 
   subgraph Push["Web Push Service"]
@@ -41,20 +40,19 @@ graph TD
   end
 
   UI -->|REST| API
-  UI -->|store/read| LS
-  UI -->|SYNC_PUSH_CONTEXT| SW
+  UI -->|Store/Read| LS
+  UI -->|Sync Context| SW
 
-  API -->|read/write| DB
-  API -->|quota check| DO
-  API -->|enqueue| Q
-  API -->|tickle push| PS
+  API -->|Read/Write + Activity Tracking| DB
+  API -->|Quota Check| DO
+  API -->|Trigger Push| PS
 
-  PS -.->|push event| SW
+  PS -.->|Push Event| SW
   SW -->|GET /api/push/pending| API
-  API -->|pending返却 + delivered更新| SW
-  SW -->|showNotification| UI
+  API -->|Fetch & Mark Delivered| DB
+  SW -->|Show Notification| UI
 
-  CRON -->|quota reset + GC| API
+  CRON -->|Quota Reset & Auto Cleanup| API
   API --> DB
 ```
 
@@ -142,51 +140,43 @@ d1 migrations apply renrakun --remote --auto-confirm
 - 自動同期は多重実行を抑止し、最短5秒の間引きを行い、明示的なロード中は実行しません。
 - 手動の `更新` 操作はフォールバック手段として提供します。
 
-## 手動整理向けの活動追跡（`last_activity_at`）
+## 手動整理向けの活動追跡（last_activity_at）
 
-- `groups.last_activity_at` と `members.last_activity_at` は、書き込み操作時のみ更新されます。
-- 読み取り専用API（`catalog` / `layout` / `inbox` / `push pending`）では更新しません（無料枠の書き込み保護のため）。
-- D1容量が逼迫してきた場合に、長期未使用データの手動整理判断に利用できます。
+D1ストレージの無料枠容量制限（500MB）を効率的に運用するため、活動状況のトラッキングを導入しています。
 
-### 手動抽出SQL例（180日以上の未活動候補）
+### 1. 設計判断とトレードオフ
 
-```sql
--- 未完了依頼がなく、長期間活動のないグループ候補
-SELECT
-  g.id,
-  g.created_at,
-  g.last_activity_at,
-  COUNT(DISTINCT m.id) AS member_count
+本システムでは、あえて「全自動削除」ではなく「手動整理のための指標提供」を優先しています。
+
+* **無料枠の書き込み保護（Rows Written）**: 読み取り専用API（インボックスの取得、カタログ参照等）では、last_activity_at の更新を行いません。これは、日常的なアプリ利用による不要なD1書き込みを抑止し、無料枠のクォータを節約するためです。
+* **安全性の確保**: 家庭内の重要なデータを扱う性質上、自動ロジックによる誤削除のリスクを完全に排除し、最終的な削除判断を人間（管理者）が行えるようにしています。
+* **実利的なアプローチ**: テキスト主体のデータ構造では500MBを使い切るまでに十分な猶予があるため、現時点での自動化は「過剰実装（Over-engineering）」と判断し、シンプルな活動追跡に留めています。
+
+### 2. 更新ルール
+
+* **更新される（Write）**: グループ作成・参加、依頼作成・更新、カタログ編集、Push購読更新。
+* **更新されない（Read）**: カタログ・レイアウト取得、インボックス取得、Push未読取得。
+
+### 3. 手動抽出SQL例（180日以上未活動）
+
+SELECT 
+  g.id, 
+  COALESCE(g.last_activity_at, g.created_at) as effective_last_activity, 
+  COUNT(m.id) as members
 FROM groups g
-LEFT JOIN members m ON m.group_id = g.id
-WHERE COALESCE(g.last_activity_at, g.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
+LEFT JOIN members m ON g.id = m.group_id
+WHERE COALESCE(g.last_activity_at, g.created_at) < date('now', '-180 days') -- 別名ではなく元の式を書く
   AND NOT EXISTS (
-    SELECT 1
-    FROM requests r
-    WHERE r.group_id = g.id
-      AND r.status IN ('requested', 'acknowledged')
+    SELECT 1 FROM requests r 
+    WHERE r.group_id = g.id AND r.status IN ('requested', 'acknowledged')
   )
-GROUP BY g.id
-ORDER BY COALESCE(g.last_activity_at, g.created_at) ASC;
-
--- 長期間活動のないメンバー候補
-SELECT
-  m.id,
-  m.group_id,
-  m.display_name,
-  m.role,
-  m.created_at,
-  m.last_activity_at
-FROM members m
-WHERE COALESCE(m.last_activity_at, m.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
-ORDER BY COALESCE(m.last_activity_at, m.created_at) ASC;
-```
+GROUP BY g.id;
 
 ## 仕様・制限事項
 
-- iOSのWeb PushはOSバージョン・ホーム画面追加・通知許可設定に依存します
-- 通知要約はロック画面に表示されるため、機微情報の送信は避けてください
-- 書き込み系APIは無料枠保護のため日次上限で一時停止し、翌日 0:00 JST に自動復帰します
-- `購入完了` は既定14日後に自動削除、`依頼中` / `対応中` は自動削除しません
-- 未使用グループは条件を満たした場合に段階的に整理されます（候補化60日 + 猶予30日）
-- 本MVPに価格比較・在庫管理・EC連携は含みません
+- **iOS対応**: iOSのWeb PushはOSバージョン・ホーム画面追加・通知許可設定に依存します。
+- **プライバシー**: 通知要約はロック画面に表示されるため、機微情報の送信は避けてください。
+- **書き込み制限**: 無料枠保護のため、API書き込みは日次上限に達すると一時停止し、翌 0:00 JST に自動復帰します。
+- **依頼の保持**: 「購入完了」済みの依頼は既定14日後に自動削除されます。「依頼中」「対応中」は自動削除しません。
+- **未使用グループ**: メンバー1名のみ・通知設定なし等の条件を満たす場合、Cron Triggerにより段階的に整理（候補化60日 + 猶予30日）されます。
+- **スコープ**: 本MVPに価格比較・在庫管理・EC連携は含みません。
