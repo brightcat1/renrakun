@@ -265,20 +265,21 @@ app.post('/api/groups/create', async (c) => {
   const inviteToken = randomToken(24)
   const inviteTokenHash = await sha256Hex(inviteToken)
   const passphraseHash = await hashPassphrase(passphrase)
+  const activityAt = nowIso()
 
   await c.env.DB.batch([
     c.env.DB.prepare(
       `
-      INSERT INTO groups (id, invite_token_hash, passphrase_hash)
-      VALUES (?, ?, ?)
+      INSERT INTO groups (id, invite_token_hash, passphrase_hash, last_activity_at)
+      VALUES (?, ?, ?, ?)
       `
-    ).bind(groupId, inviteTokenHash, passphraseHash),
+    ).bind(groupId, inviteTokenHash, passphraseHash, activityAt),
     c.env.DB.prepare(
       `
-      INSERT INTO members (id, group_id, device_id, display_name, role)
-      VALUES (?, ?, ?, ?, 'admin')
+      INSERT INTO members (id, group_id, device_id, display_name, role, last_activity_at)
+      VALUES (?, ?, ?, ?, 'admin', ?)
       `
-    ).bind(memberId, groupId, deviceId, displayName)
+    ).bind(memberId, groupId, deviceId, displayName, activityAt)
   ])
 
   const response: GroupCreateResponse = {
@@ -335,6 +336,7 @@ app.post('/api/groups/join', async (c) => {
     .first<{ id: string; role: 'admin' | 'member' }>()
 
   if (existing) {
+    await touchGroupAndMemberActivity(c.env, group.id, existing.id)
     const response: GroupJoinResponse = {
       groupId: group.id,
       memberId: existing.id,
@@ -344,14 +346,25 @@ app.post('/api/groups/join', async (c) => {
   }
 
   const memberId = crypto.randomUUID()
-  await c.env.DB.prepare(
-    `
-    INSERT INTO members (id, group_id, device_id, display_name, role)
-    VALUES (?, ?, ?, ?, 'member')
-    `
-  )
-    .bind(memberId, group.id, deviceId, displayName)
-    .run()
+  const activityAt = nowIso()
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `
+      INSERT INTO members (id, group_id, device_id, display_name, role, last_activity_at)
+      VALUES (?, ?, ?, ?, 'member', ?)
+      `
+    ).bind(memberId, group.id, deviceId, displayName, activityAt),
+    c.env.DB.prepare(
+      `
+      UPDATE groups
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, group.id)
+  ])
 
   const response: GroupJoinResponse = {
     groupId: group.id,
@@ -476,6 +489,7 @@ app.post('/api/groups/:groupId/custom-tabs', async (c) => {
   )
     .bind(tabId, groupId, parsed.data.name, nextSort)
     .run()
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
 
   return c.json<CatalogTab>(
     {
@@ -540,6 +554,7 @@ app.post('/api/groups/:groupId/custom-items', async (c) => {
   )
     .bind(itemId, parsed.data.tabId, groupId, parsed.data.name, nextSort)
     .run()
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
 
   return c.json<CatalogItem>(
     {
@@ -579,10 +594,12 @@ app.post('/api/groups/:groupId/custom-tabs/:tabId/delete', async (c) => {
   }
 
   if (tabRow.archivedAt) {
+    await touchGroupAndMemberActivity(c.env, groupId, member.id)
     return c.json({ ok: true })
   }
 
   await archiveTab(c, tabId)
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
   return c.json({ ok: true })
 })
 
@@ -616,10 +633,12 @@ app.post('/api/groups/:groupId/custom-items/:itemId/delete', async (c) => {
   }
 
   if (itemRow.archivedAt) {
+    await touchGroupAndMemberActivity(c.env, groupId, member.id)
     return c.json({ ok: true })
   }
 
   await archiveItem(c, itemId)
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
   return c.json({ ok: true })
 })
 
@@ -639,6 +658,7 @@ app.post('/api/push/subscribe', async (c) => {
   if (quotaBlocked) return quotaBlocked
 
   const id = crypto.randomUUID()
+  const activityAt = nowIso()
   await c.env.DB.prepare(
     `
     INSERT INTO push_subscriptions (id, member_id, endpoint, p256dh, auth, updated_at)
@@ -656,9 +676,10 @@ app.post('/api/push/subscribe', async (c) => {
       payload.data.subscription.endpoint,
       payload.data.subscription.keys.p256dh,
       payload.data.subscription.keys.auth,
-      nowIso()
+      activityAt
     )
     .run()
+  await touchGroupAndMemberActivity(c.env, payload.data.groupId, payload.data.memberId, activityAt)
 
   return c.json({ ok: true })
 })
@@ -778,6 +799,7 @@ app.post('/api/requests', async (c) => {
   }
 
   const requestId = crypto.randomUUID()
+  const activityAt = nowIso()
   const members = await c.env.DB.prepare(
     `
     SELECT id
@@ -858,6 +880,30 @@ app.post('/api/requests', async (c) => {
       )
     )
   }
+  batchStatements.push(
+    c.env.DB.prepare(
+      `
+      UPDATE groups
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, data.groupId)
+  )
+  batchStatements.push(
+    c.env.DB.prepare(
+      `
+      UPDATE members
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, member.id)
+  )
 
   await c.env.DB.batch(batchStatements)
 
@@ -981,6 +1027,7 @@ app.post('/api/requests/:requestId/ack', async (c) => {
   }
 
   const beforeStatus = await readRequestStatus(c, requestId)
+  const activityAt = nowIso()
 
   await c.env.DB.batch([
     c.env.DB.prepare(
@@ -999,7 +1046,27 @@ app.post('/api/requests/:requestId/ack', async (c) => {
       SET read_at = COALESCE(read_at, ?)
       WHERE request_id = ? AND recipient_member_id = ?
       `
-    ).bind(nowIso(), requestId, member.id)
+    ).bind(activityAt, requestId, member.id),
+    c.env.DB.prepare(
+      `
+      UPDATE groups
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, ownsInboxEvent.groupId),
+    c.env.DB.prepare(
+      `
+      UPDATE members
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, member.id)
   ])
 
   const status = await readRequestStatus(c, requestId)
@@ -1058,6 +1125,7 @@ app.post('/api/requests/:requestId/complete', async (c) => {
   }
 
   const beforeStatus = await readRequestStatus(c, requestId)
+  const activityAt = nowIso()
 
   await c.env.DB.batch([
     c.env.DB.prepare(
@@ -1073,7 +1141,27 @@ app.post('/api/requests/:requestId/complete', async (c) => {
       SET read_at = COALESCE(read_at, ?)
       WHERE request_id = ? AND recipient_member_id = ?
       `
-    ).bind(nowIso(), requestId, member.id)
+    ).bind(activityAt, requestId, member.id),
+    c.env.DB.prepare(
+      `
+      UPDATE groups
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, ownsInboxEvent.groupId),
+    c.env.DB.prepare(
+      `
+      UPDATE members
+      SET last_activity_at = CASE
+        WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+        ELSE last_activity_at
+      END
+      WHERE id = ?
+      `
+    ).bind(activityAt, activityAt, member.id)
   ])
 
   const status = await readRequestStatus(c, requestId)
@@ -1294,6 +1382,45 @@ function createInClause(length: number): string {
     throw new Error('IN clause requires at least one value')
   }
   return new Array(length).fill('?').join(',')
+}
+
+async function touchGroupActivity(env: Env, groupId: string, atIso: string = nowIso()): Promise<void> {
+  await env.DB.prepare(
+    `
+    UPDATE groups
+    SET last_activity_at = CASE
+      WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+      ELSE last_activity_at
+    END
+    WHERE id = ?
+    `
+  )
+    .bind(atIso, atIso, groupId)
+    .run()
+}
+
+async function touchMemberActivity(env: Env, memberId: string, atIso: string = nowIso()): Promise<void> {
+  await env.DB.prepare(
+    `
+    UPDATE members
+    SET last_activity_at = CASE
+      WHEN last_activity_at IS NULL OR last_activity_at < ? THEN ?
+      ELSE last_activity_at
+    END
+    WHERE id = ?
+    `
+  )
+    .bind(atIso, atIso, memberId)
+    .run()
+}
+
+async function touchGroupAndMemberActivity(
+  env: Env,
+  groupId: string,
+  memberId: string,
+  atIso: string = nowIso()
+): Promise<void> {
+  await Promise.all([touchGroupActivity(env, groupId, atIso), touchMemberActivity(env, memberId, atIso)])
 }
 
 async function readJson(request: Request): Promise<unknown> {

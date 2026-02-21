@@ -144,6 +144,46 @@ If push is not arriving, check in this order:
 - Auto-sync refresh is serialized and throttled (minimum interval: 5 seconds) and is suppressed while an explicit load is in progress.
 - A manual `Refresh` action remains available as a fallback mechanism.
 
+## Activity Tracking for Manual Cleanup
+
+- `groups.last_activity_at` and `members.last_activity_at` are updated on write actions only.
+- Read-only APIs (`catalog` / `layout` / `inbox` / `push pending`) do not update activity timestamps to protect free-tier write budget.
+- Use this tracking for manual operations when D1 capacity approaches limits.
+
+### Manual query examples (180-day stale candidates)
+
+```sql
+-- Groups with no unresolved requests and no recent activity
+SELECT
+  g.id,
+  g.created_at,
+  g.last_activity_at,
+  COUNT(DISTINCT m.id) AS member_count
+FROM groups g
+LEFT JOIN members m ON m.group_id = g.id
+WHERE COALESCE(g.last_activity_at, g.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
+  AND NOT EXISTS (
+    SELECT 1
+    FROM requests r
+    WHERE r.group_id = g.id
+      AND r.status IN ('requested', 'acknowledged')
+  )
+GROUP BY g.id
+ORDER BY COALESCE(g.last_activity_at, g.created_at) ASC;
+
+-- Members with no recent activity
+SELECT
+  m.id,
+  m.group_id,
+  m.display_name,
+  m.role,
+  m.created_at,
+  m.last_activity_at
+FROM members m
+WHERE COALESCE(m.last_activity_at, m.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
+ORDER BY COALESCE(m.last_activity_at, m.created_at) ASC;
+```
+
 ## Specifications & Limitations
 
 - iOS Web Push depends on OS version, Home Screen install, and notification permission

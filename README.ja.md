@@ -142,6 +142,46 @@ d1 migrations apply renrakun --remote --auto-confirm
 - 自動同期は多重実行を抑止し、最短5秒の間引きを行い、明示的なロード中は実行しません。
 - 手動の `更新` 操作はフォールバック手段として提供します。
 
+## 手動整理向けの活動追跡（`last_activity_at`）
+
+- `groups.last_activity_at` と `members.last_activity_at` は、書き込み操作時のみ更新されます。
+- 読み取り専用API（`catalog` / `layout` / `inbox` / `push pending`）では更新しません（無料枠の書き込み保護のため）。
+- D1容量が逼迫してきた場合に、長期未使用データの手動整理判断に利用できます。
+
+### 手動抽出SQL例（180日以上の未活動候補）
+
+```sql
+-- 未完了依頼がなく、長期間活動のないグループ候補
+SELECT
+  g.id,
+  g.created_at,
+  g.last_activity_at,
+  COUNT(DISTINCT m.id) AS member_count
+FROM groups g
+LEFT JOIN members m ON m.group_id = g.id
+WHERE COALESCE(g.last_activity_at, g.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
+  AND NOT EXISTS (
+    SELECT 1
+    FROM requests r
+    WHERE r.group_id = g.id
+      AND r.status IN ('requested', 'acknowledged')
+  )
+GROUP BY g.id
+ORDER BY COALESCE(g.last_activity_at, g.created_at) ASC;
+
+-- 長期間活動のないメンバー候補
+SELECT
+  m.id,
+  m.group_id,
+  m.display_name,
+  m.role,
+  m.created_at,
+  m.last_activity_at
+FROM members m
+WHERE COALESCE(m.last_activity_at, m.created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')
+ORDER BY COALESCE(m.last_activity_at, m.created_at) ASC;
+```
+
 ## 仕様・制限事項
 
 - iOSのWeb PushはOSバージョン・ホーム画面追加・通知許可設定に依存します
