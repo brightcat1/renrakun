@@ -49,6 +49,13 @@ export interface DbStore {
   sortOrder: number
 }
 
+export interface DbMemberPresence {
+  id: string
+  displayName: string
+  role: Role
+  pushReady: number
+}
+
 export interface DbRequestRow {
   eventId: string
   requestId: string

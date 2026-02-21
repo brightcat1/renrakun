@@ -22,7 +22,16 @@ import { HTTPException } from 'hono/http-exception'
 import { sendWebPush, type PushSubscriptionRecord } from './push'
 import { QuotaGateDO } from './quota-do'
 import { getJstDayKey, getNextJstMidnightIso, nowIso } from './time'
-import type { AuthedMember, DbItem, DbRequestItemRow, DbRequestRow, DbStore, DbTab, Env } from './types'
+import type {
+  AuthedMember,
+  DbItem,
+  DbMemberPresence,
+  DbRequestItemRow,
+  DbRequestRow,
+  DbStore,
+  DbTab,
+  Env
+} from './types'
 
 const app = new Hono<{ Bindings: Env }>()
 const PASSHASH_PREFIX = 'pbkdf2_sha256'
@@ -171,7 +180,8 @@ app.get('/api/catalog', async (c) => {
   return c.json<LayoutResponse>({
     tabs: tabs.results.map((row) => mapTab(row, language)),
     items: items.results.map((row) => mapItem(row, language)),
-    stores: stores.results.map((row) => mapStore(row, language))
+    stores: stores.results.map((row) => mapStore(row, language)),
+    members: []
   })
 })
 
@@ -338,10 +348,40 @@ app.get('/api/groups/:groupId/layout', async (c) => {
     .bind(groupId)
     .all<DbStore>()
 
+  const members = await c.env.DB.prepare(
+    `
+    SELECT
+      m.id,
+      m.display_name AS displayName,
+      m.role,
+      CASE
+        WHEN EXISTS (
+          SELECT 1
+          FROM push_subscriptions ps
+          WHERE ps.member_id = m.id
+        ) THEN 1
+        ELSE 0
+      END AS pushReady
+    FROM members m
+    WHERE m.group_id = ?
+    ORDER BY
+      CASE WHEN m.role = 'admin' THEN 0 ELSE 1 END ASC,
+      m.created_at ASC
+    `
+  )
+    .bind(groupId)
+    .all<DbMemberPresence>()
+
   return c.json<LayoutResponse>({
     tabs: tabs.results.map((row) => mapTab(row, language)),
     items: items.results.map((row) => mapItem(row, language)),
-    stores: stores.results.map((row) => mapStore(row, language))
+    stores: stores.results.map((row) => mapStore(row, language)),
+    members: members.results.map((row) => ({
+      id: row.id,
+      displayName: row.displayName,
+      role: row.role,
+      pushReady: !!row.pushReady
+    }))
   })
 })
 

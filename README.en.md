@@ -136,6 +136,15 @@ npx wrangler secret put VAPID_SUBJECT
 2. Android (Chrome): open app URL -> menu -> `Add to Home Screen`
 3. After install, tap the in-app Enable Notifications button and allow notifications
 
+## Push Troubleshooting
+
+If push does not arrive, check in this order:
+1. Tap `Resync notifications` in the app.
+2. Confirm migrations are applied (`--local` / `--remote` as needed).
+3. Check API logs (`wrangler tail`) before attempting any DB reset.
+
+The app now shows a `Members in group` card with each member's notification state (`Notifications OK` / `Notifications off`) for quick diagnosis.
+
 ## CI/CD & Deployment
 
 This repository implements an automated CI/CD pipeline using GitHub Actions and Cloudflare Pages.

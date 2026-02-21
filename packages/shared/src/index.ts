@@ -95,10 +95,18 @@ export interface GroupJoinResponse {
   role: Role
 }
 
+export interface GroupMemberPresence {
+  id: string
+  displayName: string
+  role: Role
+  pushReady: boolean
+}
+
 export interface LayoutResponse {
   tabs: CatalogTab[]
   items: CatalogItem[]
   stores: StoreButton[]
+  members: GroupMemberPresence[]
 }
 
 export interface InboxEvent {

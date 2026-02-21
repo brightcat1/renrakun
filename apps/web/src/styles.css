@@ -105,6 +105,82 @@ body {
   padding: 1.1rem;
 }
 
+.members-card {
+  margin-top: 0.9rem;
+  padding: 1rem;
+}
+
+.members-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.members-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.members-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.members-list {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid #d7e5ea;
+  border-radius: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  background: #fcfdfd;
+}
+
+.member-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.role-badge,
+.push-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.18rem 0.48rem;
+  line-height: 1.2;
+}
+
+.role-badge {
+  color: #6e4a11;
+  background: #ffedcf;
+}
+
+.push-badge.ok {
+  color: #0a6e48;
+  background: #d9f4e7;
+}
+
+.push-badge.warn {
+  color: #7f5411;
+  background: #ffe9c9;
+}
+
+.members-hint {
+  margin-top: 0.65rem;
+}
+
 .invite-card p {
   margin: 0;
   line-height: 1.45;

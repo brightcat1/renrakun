@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RequestStatus } from '@renrakun/shared'
 import {
   ApiClientError,
@@ -59,6 +59,7 @@ interface Messages {
   dashboardTitle: string
   hello: (name: string) => string
   enableNotifications: string
+  resyncNotifications?: string
   leaveGroup: string
   quotaPaused: (resumeAt: string) => string
   retentionBannerTitle: string
@@ -67,6 +68,13 @@ interface Messages {
   retentionBannerDetailsPoints: string[]
   inviteLinkLabel: string
   copyInviteLink: string
+  membersTitle?: string
+  membersCount?: (count: number) => string
+  memberCreatorBadge?: string
+  memberPushReady?: string
+  memberPushNotReady?: string
+  memberYouSuffix?: string
+  memberResyncHint?: string
   touchLoading: string
   touchEmpty: string
   inboxTitle: string
@@ -445,6 +453,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [statusText, setStatusText] = useState(() => MESSAGES[getInitialLanguage()].defaultStatus)
   const [errorText, setErrorText] = useState('')
+  const [lastLoadErrorCode, setLastLoadErrorCode] = useState('')
   const [quotaResumeAt, setQuotaResumeAt] = useState<string | null>(null)
   const [inviteFromLink, setInviteFromLink] = useState(false)
   const [showManualJoinInput, setShowManualJoinInput] = useState(false)
@@ -452,6 +461,7 @@ export default function App() {
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   )
   const [isLoading, setIsLoading] = useState(false)
+  const lastSyncedMemberIdRef = useRef<string | null>(null)
 
   const auth = useMemo(
     () => (session ? { deviceId, memberId: session.memberId } : null),
@@ -494,6 +504,7 @@ export default function App() {
     if (!session || !auth) return
     setIsLoading(true)
     setErrorText('')
+    setLastLoadErrorCode('')
     try {
       const [layoutData, inboxData] = await Promise.all([
         fetchLayout(session.groupId, auth),
@@ -509,6 +520,7 @@ export default function App() {
       if (isQuotaError(error)) {
         setQuotaResumeAt(error.resumeAt ?? null)
       } else if (error instanceof ApiClientError) {
+        setLastLoadErrorCode(error.code)
         console.error('[loadPrivateData] API error', {
           status: error.status,
           code: error.code,
@@ -531,13 +543,14 @@ export default function App() {
           setErrorText(messages.errors.loadFailed)
         }
       } else {
+        setLastLoadErrorCode('UNKNOWN_ERROR')
         console.error('[loadPrivateData] unexpected error', error)
         setErrorText(messages.errors.loadFailed)
       }
     } finally {
       setIsLoading(false)
     }
-  }, [auth, customItemTabId, messages.errors.invalidSession, messages.errors.loadFailed, session])
+  }, [auth, messages.errors.invalidSession, messages.errors.loadFailed, session])
 
   const refreshQuota = useCallback(async () => {
     try {
@@ -626,6 +639,26 @@ export default function App() {
   )
   const showInviteOnlyJoin = inviteFromLink && !showManualJoinInput
   const inviteCopyLabel = messages.copyInviteLink || (language === 'ja' ? '招待リンクをコピー' : 'Copy invite link')
+  const notificationActionLabel =
+    notificationPermission === 'granted'
+      ? messages.resyncNotifications || (language === 'ja' ? '通知を再同期' : 'Resync notifications')
+      : messages.enableNotifications
+  const membersTitle = messages.membersTitle || (language === 'ja' ? '参加中メンバー' : 'Members in group')
+  const membersCount = messages.membersCount
+    ? messages.membersCount((layout?.members?.length ?? 0))
+    : language === 'ja'
+      ? `${layout?.members?.length ?? 0}人`
+      : `${layout?.members?.length ?? 0} members`
+  const memberCreatorBadge = messages.memberCreatorBadge || (language === 'ja' ? '作成者' : 'Creator')
+  const memberPushReady = messages.memberPushReady || (language === 'ja' ? '通知OK' : 'Notifications OK')
+  const memberPushNotReady =
+    messages.memberPushNotReady || (language === 'ja' ? '通知未設定' : 'Notifications off')
+  const memberYouSuffix = messages.memberYouSuffix || (language === 'ja' ? '（あなた）' : '(You)')
+  const memberResyncHint =
+    messages.memberResyncHint ||
+    (language === 'ja'
+      ? '通知が届かない場合は「通知を再同期」を押してください。'
+      : 'If notifications do not arrive, tap "Resync notifications".')
 
   const applyError = useCallback((error: unknown, fallback: string) => {
     if (isQuotaError(error)) {
@@ -727,17 +760,53 @@ export default function App() {
       if (permission !== 'granted') return
 
       const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: toServerKey(publicKey) as unknown as BufferSource
-      })
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: toServerKey(publicKey) as unknown as BufferSource
+        })
+      }
 
       await subscribePush(session.groupId, session.memberId, auth, subscription)
+      lastSyncedMemberIdRef.current = session.memberId
       setStatusText(messages.statusTexts.pushEnabled)
+      await loadPrivateData()
     } catch (error) {
       applyError(error, messages.errors.pushFailed)
     }
-  }, [applyError, auth, messages.errors.pushFailed, messages.errors.vapidMissing, messages.statusTexts.pushEnabled, session])
+  }, [
+    applyError,
+    auth,
+    loadPrivateData,
+    messages.errors.pushFailed,
+    messages.errors.vapidMissing,
+    messages.statusTexts.pushEnabled,
+    session
+  ])
+
+  const syncPushSubscription = useCallback(async () => {
+    if (!session || !auth) return
+    if (!('serviceWorker' in navigator) || typeof Notification === 'undefined') return
+    if (notificationPermission !== 'granted') return
+    if (lastSyncedMemberIdRef.current === session.memberId) return
+
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.getSubscription()
+      if (!subscription) return
+      await subscribePush(session.groupId, session.memberId, auth, subscription)
+      lastSyncedMemberIdRef.current = session.memberId
+      await loadPrivateData()
+    } catch (error) {
+      console.error('[push-sync] failed', error)
+    }
+  }, [auth, loadPrivateData, notificationPermission, session])
+
+  useEffect(() => {
+    if (!session) return
+    void syncPushSubscription()
+  }, [session, syncPushSubscription])
 
   const handleAddToCart = useCallback((itemId: string) => {
     setCart((current) => ({
@@ -1086,9 +1155,9 @@ export default function App() {
           <button type="button" className="language-button" onClick={handleToggleLanguage}>
             {messages.languageSwitch}
           </button>
-          {notificationPermission !== 'granted' && (
+          {notificationPermission !== 'unsupported' && (
             <button type="button" onClick={handleEnablePush}>
-              {messages.enableNotifications}
+              {notificationActionLabel}
             </button>
           )}
           <button
@@ -1104,6 +1173,8 @@ export default function App() {
               setJoinMode('create')
               setInviteFromLink(false)
               setShowManualJoinInput(false)
+              setLastLoadErrorCode('')
+              lastSyncedMemberIdRef.current = null
             }}
           >
             {messages.leaveGroup}
@@ -1139,12 +1210,41 @@ export default function App() {
         </section>
       )}
 
+      <section className="card members-card">
+        <div className="members-header">
+          <h2>{membersTitle}</h2>
+          <span className="members-count">{membersCount}</span>
+        </div>
+        <ul className="members-list">
+          {!layout && <li className="empty">{messages.touchLoading}</li>}
+          {layout?.members.map((member) => {
+            const isSelf = member.id === session.memberId
+            return (
+              <li key={member.id} className="member-row">
+                <div className="member-name">
+                  <strong>
+                    {member.displayName}
+                    {isSelf ? ` ${memberYouSuffix}` : ''}
+                  </strong>
+                  {member.role === 'admin' && <span className="role-badge">{memberCreatorBadge}</span>}
+                </div>
+                <span className={`push-badge ${member.pushReady ? 'ok' : 'warn'}`}>
+                  {member.pushReady ? memberPushReady : memberPushNotReady}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+        <p className="sub-text members-hint">{memberResyncHint}</p>
+      </section>
+
       <div className="main-grid">
         <div className="main-left">
           <section className="card touch-card">
             {!hasTouchData ? (
               <div className="touch-fallback">
                 <p>{touchFallbackMessage}</p>
+                {lastLoadErrorCode && <small className="sub-text">Error code: {lastLoadErrorCode}</small>}
                 <button type="button" onClick={() => void loadPrivateData()} disabled={isLoading}>
                   {messages.refresh}
                 </button>
