@@ -26,7 +26,7 @@ import type { AuthedMember, DbItem, DbRequestItemRow, DbRequestRow, DbStore, DbT
 
 const app = new Hono<{ Bindings: Env }>()
 const PASSHASH_PREFIX = 'pbkdf2_sha256'
-const PASSHASH_ITERATIONS = 120000
+const PASSHASH_ITERATIONS = 50000
 const PASSHASH_SALT_BYTES = 16
 const PASSHASH_KEY_BYTES = 32
 const DEFAULT_COMPLETED_RETENTION_DAYS = 30
