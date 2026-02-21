@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RequestStatus } from '@renrakun/shared'
 import {
+  API_BASE_URL,
   ApiClientError,
   ackRequest,
   completeRequest,
@@ -28,6 +29,18 @@ type JoinMode = 'create' | 'join'
 type Language = 'ja' | 'en'
 type DeleteTargetKind = 'tab' | 'item'
 type InboxFilter = 'open' | 'all'
+type SwPushContextMessage =
+  | {
+      type: 'SYNC_PUSH_CONTEXT'
+      payload: {
+        apiBase: string
+        groupId: string
+        memberId: string
+        deviceId: string
+        language: Language
+      }
+    }
+  | { type: 'CLEAR_PUSH_CONTEXT' }
 
 interface DeleteTarget {
   kind: DeleteTargetKind
@@ -807,6 +820,36 @@ export default function App() {
     if (!session) return
     void syncPushSubscription()
   }, [session, syncPushSubscription])
+
+  const postPushContextMessage = useCallback(async (message: SwPushContextMessage) => {
+    if (!('serviceWorker' in navigator)) return
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const target = registration.active ?? navigator.serviceWorker.controller
+      target?.postMessage(message)
+      console.info('[sw-context] synced', { type: message.type })
+    } catch (error) {
+      console.error('[sw-context] sync failed', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    if (session && auth) {
+      void postPushContextMessage({
+        type: 'SYNC_PUSH_CONTEXT',
+        payload: {
+          apiBase: API_BASE_URL,
+          groupId: session.groupId,
+          memberId: session.memberId,
+          deviceId,
+          language
+        }
+      })
+      return
+    }
+    void postPushContextMessage({ type: 'CLEAR_PUSH_CONTEXT' })
+  }, [auth, deviceId, language, postPushContextMessage, session])
 
   const handleAddToCart = useCallback((itemId: string) => {
     setCart((current) => ({

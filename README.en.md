@@ -1,101 +1,90 @@
 # renrakun
 
-`renrakun` is a household restock messenger PWA focused on tap-only interactions.  
-It keeps shopping requests out of daily chat noise by using a dedicated ordering-style interface and inbox.
+`renrakun` is a household restock messenger PWA built for tap-only interactions.  
+It keeps shopping requests out of daily chat noise with a dedicated panel + inbox workflow.
 
 ## MVP Features
 
-- Touch-panel UI to add household items and send requests quickly
-- Push notifications + in-app inbox for group members
+- Touch-panel UI for fast request creation
+- Group join via invite link + passphrase (no account registration)
 - Request status flow: `Requested` / `In progress` / `Completed`
-- Admin-only custom tabs and custom item buttons per group
-- Daily free-tier guard: write APIs pause on quota and auto-resume at 00:00 JST
+- Lock-screen push summaries (who + what)
+- Group creator can manage custom tabs/items
+- Free-tier guardrails (daily limits, auto resume, staged cleanup)
 
 ## Architecture & Tech Stack
 
-This application is built on a Cloudflare-native serverless architecture, combining a React frontend with a Workers/D1 API:
+- **Web**: React + TypeScript + Vite + `vite-plugin-pwa` (Cloudflare Pages)
+- **API**: Cloudflare Workers (Hono) + D1
+- **State**: Durable Objects (QuotaGate)
+- **Shared**: `packages/shared` (Zod schemas + shared types)
+- **Monorepo**: pnpm workspace
 
 ```mermaid
 graph TD
-    subgraph Client ["📱 Client (Browser / PWA)"]
-        UI["React Web App<br/>(Vite)"]
-        LS[("LocalStorage<br/>(Session / UUID)")]
-        SW["Service Worker<br/>(Web Push)"]
-    end
+  subgraph Client["Client (Browser / PWA)"]
+    UI["Web App\n(React + Vite PWA)"]
+    SW["Service Worker"]
+    LS[("LocalStorage\n(session/device)")]
+  end
 
-    subgraph Cloudflare ["☁️ Cloudflare Edge Network"]
-        API["Workers (Hono)<br/>API Server"]
-        DO[("Durable Objects<br/>(QuotaGateDO)")]
-        DB[("D1 (SQLite)<br/>Relational Database")]
-        CRON(("Cron Triggers<br/>(Scheduled Events)"))
-    end
+  subgraph Edge["Cloudflare Edge"]
+    API["Workers API\n(Hono)"]
+    DO[("Durable Object\nQuotaGate")]
+    DB[("D1 (SQLite)")]
+    Q[("push_notifications queue")]
+    CRON["Cron Trigger\n(daily maintenance)"]
+  end
 
-    subgraph External ["🌐 External Services"]
-        PushService["Push Provider<br/>(Apple / Google / Mozilla)"]
-    end
+  subgraph Push["Web Push Service"]
+    PS["Apple / Google / Mozilla"]
+  end
 
-    %% Client Interactions
-    UI -- "1. Read/Write Keys" --> LS
-    UI -- "2. REST API (HTTPS)" --> API
-    
-    %% Backend Interactions
-    API -- "3. Query / Mutate" --> DB
-    API -- "4. Check Limit" --> DO
-    CRON -- "5. Daily GC & Quota Reset" --> API
-    
-    %% Push Notification Flow
-    API -- "6. Web Push Protocol" --> PushService
-    PushService -. "7. Deliver Notification" .-> SW
-    SW -. "8. Show Alert" .-> UI
+  UI -->|REST| API
+  UI -->|store/read| LS
+  UI -->|SYNC_PUSH_CONTEXT| SW
 
-    classDef cf fill:#f38020,stroke:#d36000,stroke-width:2px,color:white;
-    classDef client fill:#00a4d3,stroke:#007b9f,stroke-width:2px,color:white;
-    classDef ext fill:#6c757d,stroke:#495057,stroke-width:2px,color:white;
-    classDef db fill:#0051c3,stroke:#003a8c,stroke-width:2px,color:white;
+  API -->|read/write| DB
+  API -->|quota check| DO
+  API -->|enqueue| Q
+  API -->|tickle push| PS
 
-    class API,CRON cf;
-    class DB,DO db;
-    class UI,LS,SW client;
-    class PushService ext;
+  PS -.->|push event| SW
+  SW -->|GET /api/push/pending| API
+  API -->|return pending + mark delivered| SW
+  SW -->|showNotification| UI
+
+  CRON -->|quota reset + GC| API
+  API --> DB
 ```
-
-- **Web (Frontend):** React + TypeScript + Vite + `vite-plugin-pwa`. Delivered globally via Cloudflare Pages.
-- **API (Backend):** Cloudflare Workers (Hono) + D1 (SQLite-based Edge DB).
-- **State Management:** Durable Objects for daily quota rate-limiting.
-- **Shared:** Zod schemas and domain types in `packages/shared`.
-- **Monorepo:** pnpm workspace.
 
 ## Local Development Setup
 
-1. Install dependencies:
+1. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-2. Prepare environment files:
+2. Prepare env files
 
 ```bash
 cp apps/web/.env.example apps/web/.env
 cp apps/api/.dev.vars.example apps/api/.dev.vars
 ```
 
-- Set `VITE_API_BASE_URL=http://127.0.0.1:8787` in `apps/web/.env`.
-- Set `APP_ORIGIN=http://localhost:5173` in `apps/api/.dev.vars` (local CORS origin).
-- If you test push, run `npx web-push generate-vapid-keys --json` and set values in `apps/api/.dev.vars` plus `VITE_VAPID_PUBLIC_KEY` in `apps/web/.env`.
-- Keep `APP_ORIGIN` in `wrangler.toml` as the production URL. During `pnpm dev:api` (`wrangler dev`), `.dev.vars` overrides it for local development.
+- Set `VITE_API_BASE_URL=http://127.0.0.1:8787` in `apps/web/.env`
+- Set `APP_ORIGIN=http://localhost:5173` in `apps/api/.dev.vars`
+- For push testing, generate keys with `npx web-push generate-vapid-keys --json` and set values in both files
 
-3. Run local D1 migrations:
+3. Apply local migrations
 
 ```bash
 cd apps/api
 pnpm wrangler d1 migrations apply renrakun --local
 ```
 
-`--local` applies to local D1 state under `.wrangler/state`, not to Cloudflare production D1.
-- If the UI shows "Could not load data", check migration apply status and API logs before resetting any DB.
-
-4. Run development servers:
+4. Start dev servers
 
 ```bash
 # Terminal 1: API
@@ -105,16 +94,16 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-## Production Setup (Initial + Schema Updates)
+## Production Setup
 
-1. Apply migrations to production D1 (initial setup and whenever schema changes):
+1. Apply remote migrations (initial + schema updates)
 
 ```bash
 cd apps/api
 pnpm wrangler d1 migrations apply renrakun --remote
 ```
 
-2. Register push secrets in Cloudflare:
+2. Register push secrets
 
 ```bash
 cd apps/api
@@ -123,52 +112,32 @@ npx wrangler secret put VAPID_PUBLIC_KEY
 npx wrangler secret put VAPID_SUBJECT
 ```
 
-- If `VAPID_SUBJECT` is stored as a Secret, you do not need to hardcode an email in `wrangler.toml`.
-- Request creation still works without `VAPID_*`, but Web Push delivery is skipped.
-- Completed request retention can be tuned with `COMPLETED_RETENTION_DAYS` (default: `14` days). Use `0` or below to disable auto-purge.
-- Daily maintenance also uses capped guardrails for free-tier protection: `MAINTENANCE_MAX_DELETE_PER_RUN` (default `2000`) and `MAINTENANCE_MAX_BATCHES_PER_RUN` (default `20`), while deletion criteria follow the `COMPLETED_RETENTION_DAYS` setting.
-- Unused groups are cleaned with a balanced policy (older than 60 days, zero open requests, one member, zero push subscriptions, and zero custom tabs/items/stores): they are first marked for deletion and then physically removed after a 30-day grace period. Tune with `UNUSED_GROUP_CANDIDATE_DAYS`, `UNUSED_GROUP_DELETE_GRACE_DAYS`, `MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN`, and `MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN`.
-- The app UI also shows this retention policy as a persistent banner, so users can confirm behavior without opening README.
+## CI/CD
 
-## Use As PWA (End Users)
+- API: GitHub Actions -> Cloudflare Workers auto deploy
+- Web: Cloudflare Pages auto build/deploy
+- API migrations in CI run with:
 
-1. iPhone (Safari): open app URL -> Share -> `Add to Home Screen`
-2. Android (Chrome): open app URL -> menu -> `Add to Home Screen`
-3. After install, tap the in-app Enable Notifications button and allow notifications
+```bash
+d1 migrations apply renrakun --remote --auto-confirm
+```
+
+This avoids interactive prompts in GitHub Actions.
 
 ## Push Troubleshooting
 
-If push does not arrive, check in this order:
-1. Tap `Resync notifications` in the app.
-2. Confirm migrations are applied (`--local` / `--remote` as needed).
-3. Check API logs (`wrangler tail`) before attempting any DB reset.
+If push is not arriving, check in this order:
 
-The app now shows a `Members in group` card with each member's notification state (`Notifications OK` / `Notifications off`) for quick diagnosis.
-
-## CI/CD & Deployment
-
-This repository implements an automated CI/CD pipeline using GitHub Actions and Cloudflare Pages.
-
-- **API:** Automatically deployed to Cloudflare Workers via GitHub Actions when backend-related files are pushed to the `main` branch.
-- **Web:** Automatically built and deployed by Cloudflare Pages on repository updates.
-
-## How to use (Dev flow)
-
-1. Create a group in the web app (display name + passphrase).
-2. Share the invite link with your family member (manual token input is still available as fallback).
-3. Select tab -> tap items -> optionally choose store -> send.
-4. Receiver marks the request as `In progress`, then `Completed`.
-
-## Why not just use chat apps?
-
-- No typing for regular request operations.
-- Dedicated request inbox separated from daily chat conversations.
-- Visible outstanding requests and status transitions.
-- Household-oriented default catalog and quick buttons.
+1. Tap `Resync notifications` in the app
+2. Check member push state in `Members in group`
+3. Verify migration status (`--local` / `--remote`)
+4. Check API logs via `wrangler tail`
 
 ## Specifications & Limitations
 
-- **Push notifications**: On iOS, Web Push availability depends on OS version, Home Screen installation status, and notification permission settings.
-- **Write limits**: To stay within Cloudflare free-tier limits, write APIs are rate-limited after the daily cap is reached (auto-resets at 00:00 JST).
-- **History cleanup**: Requests marked `Completed` are auto-purged after 14 days by default (`COMPLETED_RETENTION_DAYS` can override this). `Requested` / `In progress` are not auto-purged.
-- **Scope**: This MVP does not include features such as price comparison, inventory management, or external e-commerce integrations.
+- iOS Web Push depends on OS version, Home Screen install, and notification permission
+- Lock-screen summaries can expose request text; avoid sensitive data in requests
+- Write APIs are paused at daily free-tier limits and auto-resume at 00:00 JST
+- `Completed` requests are auto-purged after 14 days by default; `Requested` / `In progress` are not auto-purged
+- Unused groups are cleaned up in stages when conditions are met (candidate 60 days + 30-day grace)
+- Price comparison, inventory sync, and external e-commerce integrations are out of MVP scope

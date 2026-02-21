@@ -6,12 +6,14 @@ import type {
   GroupJoinResponse,
   InboxEvent,
   LayoutResponse,
+  PushPendingNotification,
   QuotaResponse,
   RequestCreateInput,
   StoreButton
 } from '@renrakun/shared'
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8787'
+export const API_BASE_URL = API_BASE
 export type ApiLanguage = 'ja' | 'en'
 let apiLanguage: ApiLanguage = 'ja'
 
@@ -190,6 +192,18 @@ export function subscribePush(
 
 export function fetchQuotaStatus(): Promise<QuotaResponse> {
   return apiFetch('/api/quota/status')
+}
+
+export function fetchPendingPushNotifications(
+  groupId: string,
+  auth: SessionAuth,
+  limit = 5
+): Promise<PushPendingNotification[]> {
+  const safeLimit = Math.max(1, Math.min(20, Math.floor(limit)))
+  return apiFetch(
+    `/api/push/pending?groupId=${encodeURIComponent(groupId)}&limit=${safeLimit}`,
+    { auth }
+  )
 }
 
 export type { CatalogItem, CatalogTab, InboxEvent, LayoutResponse, StoreButton }

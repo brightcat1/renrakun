@@ -121,6 +121,17 @@ export interface InboxEvent {
   readAt: string | null
 }
 
+export interface PushPendingNotification {
+  id: string
+  requestId: string
+  kind: RequestStatus
+  senderMemberId: string
+  senderName: string
+  storeName: string | null
+  itemsSummary: string
+  createdAt: string
+}
+
 export interface QuotaResponse {
   state: QuotaState
   resumeAt: string

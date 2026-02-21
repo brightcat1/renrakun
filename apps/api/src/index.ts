@@ -12,6 +12,7 @@ import {
   type GroupJoinResponse,
   type InboxEvent,
   type LayoutResponse,
+  type PushPendingNotification,
   type QuotaResponse,
   type RequestStatus,
   type StoreButton
@@ -26,8 +27,11 @@ import type {
   AuthedMember,
   DbItem,
   DbMemberPresence,
+  DbPushPendingRow,
+  DbRequestItemNameRow,
   DbRequestItemRow,
   DbRequestRow,
+  DbRequestStoreRow,
   DbStore,
   DbTab,
   Env
@@ -45,10 +49,20 @@ const DEFAULT_UNUSED_GROUP_CANDIDATE_DAYS = 60
 const DEFAULT_UNUSED_GROUP_DELETE_GRACE_DAYS = 30
 const DEFAULT_MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN = 200
 const DEFAULT_MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN = 10
+const DEFAULT_PUSH_PENDING_LIMIT = 5
+const MAX_PUSH_PENDING_LIMIT = 20
 const COMPLETED_PURGE_BATCH_SIZE = 200
+const PUSH_NOTIFICATION_PURGE_BATCH_SIZE = 200
 const UNUSED_GROUP_CLEANUP_BATCH_SIZE = 50
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 type CatalogLanguage = 'ja' | 'en'
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+const LOG_RANK: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40
+}
 
 const UNUSED_GROUP_CANDIDATE_SQL = `
   g.created_at < ?
@@ -113,6 +127,53 @@ const SYSTEM_STORE_LABELS: Record<string, Record<CatalogLanguage, string>> = {
   'sys-store-ikea': { ja: 'IKEA', en: 'IKEA' },
   'sys-store-aeon': { ja: 'イオン', en: 'AEON' },
   'sys-store-gyomu': { ja: '業務スーパー', en: 'Wholesale Market' }
+}
+
+function resolveLogLevel(env: Env): LogLevel {
+  const value = env.LOG_LEVEL?.trim().toLowerCase()
+  if (value === 'debug' || value === 'info' || value === 'warn' || value === 'error') {
+    return value
+  }
+  return 'info'
+}
+
+function shouldLog(env: Env, level: LogLevel): boolean {
+  return LOG_RANK[level] >= LOG_RANK[resolveLogLevel(env)]
+}
+
+function writeLog(env: Env, level: LogLevel, event: string, fields: Record<string, unknown> = {}): void {
+  if (!shouldLog(env, level)) return
+  const payload = {
+    level,
+    event,
+    ...fields
+  }
+  const line = JSON.stringify(payload)
+  if (level === 'error') {
+    console.error(line)
+    return
+  }
+  if (level === 'warn') {
+    console.warn(line)
+    return
+  }
+  console.log(line)
+}
+
+function logDebug(env: Env, event: string, fields?: Record<string, unknown>): void {
+  writeLog(env, 'debug', event, fields)
+}
+
+function logInfo(env: Env, event: string, fields?: Record<string, unknown>): void {
+  writeLog(env, 'info', event, fields)
+}
+
+function logWarn(env: Env, event: string, fields?: Record<string, unknown>): void {
+  writeLog(env, 'warn', event, fields)
+}
+
+function logError(env: Env, event: string, fields?: Record<string, unknown>): void {
+  writeLog(env, 'error', event, fields)
 }
 
 app.use('*', async (c, next) => {
@@ -602,6 +663,75 @@ app.post('/api/push/subscribe', async (c) => {
   return c.json({ ok: true })
 })
 
+app.get('/api/push/pending', async (c) => {
+  const language = readCatalogLanguage(c.req)
+  const groupId = c.req.query('groupId')
+  if (!groupId) {
+    return badRequest(c, 'GROUP_ID_REQUIRED')
+  }
+
+  const member = await requireMember(c, groupId)
+  if (!member) return unauthorized(c)
+
+  const limitRaw = c.req.query('limit')
+  const parsedLimit = limitRaw ? Number(limitRaw) : DEFAULT_PUSH_PENDING_LIMIT
+  const limit = Number.isFinite(parsedLimit)
+    ? Math.max(1, Math.min(MAX_PUSH_PENDING_LIMIT, Math.floor(parsedLimit)))
+    : DEFAULT_PUSH_PENDING_LIMIT
+
+  const rows = await c.env.DB.prepare(
+    `
+    SELECT
+      id,
+      request_id AS requestId,
+      kind,
+      sender_member_id AS senderMemberId,
+      sender_name AS senderName,
+      store_name AS storeName,
+      items_summary AS itemsSummary,
+      created_at AS createdAt
+    FROM push_notifications
+    WHERE group_id = ?
+      AND recipient_member_id = ?
+      AND delivered_at IS NULL
+    ORDER BY created_at ASC
+    LIMIT ?
+    `
+  )
+    .bind(groupId, member.id, limit)
+    .all<DbPushPendingRow>()
+
+  const notifications: PushPendingNotification[] = rows.results.map((row) => ({
+    id: row.id,
+    requestId: row.requestId,
+    kind: row.kind,
+    senderMemberId: row.senderMemberId,
+    senderName: row.senderName,
+    storeName: row.storeName,
+    itemsSummary: row.itemsSummary,
+    createdAt: row.createdAt
+  }))
+
+  if (notifications.length > 0) {
+    const ids = notifications.map((row) => row.id)
+    const placeholders = createInClause(ids.length)
+    await c.env.DB.prepare(
+      `UPDATE push_notifications SET delivered_at = ? WHERE id IN (${placeholders})`
+    )
+      .bind(nowIso(), ...ids)
+      .run()
+  }
+
+  logDebug(c.env, 'push.pending.fetched', {
+    groupId,
+    memberId: member.id,
+    pendingCount: notifications.length,
+    language
+  })
+
+  return c.json<PushPendingNotification[]>(notifications)
+})
+
 app.post('/api/requests', async (c) => {
   const language = readCatalogLanguage(c.req)
   const quotaBlocked = await checkDailyWriteQuota(c)
@@ -658,6 +788,15 @@ app.post('/api/requests', async (c) => {
     .bind(data.groupId)
     .all<{ id: string }>()
 
+  const itemNameMap = new Map(
+    availableItems.map((item) => [item.id, localizeSystemItemName(item.id, item.name, language)])
+  )
+  const readableItems = [...qtyByItem.entries()].map(([itemId, qty]) => {
+    const itemName = itemNameMap.get(itemId) ?? (language === 'ja' ? '不明な項目' : 'Unknown item')
+    return qty > 1 ? `${itemName} x${qty}` : itemName
+  })
+  const itemsSummary = buildItemsSummary(readableItems, storeName, language)
+
   const batchStatements: D1PreparedStatement[] = [
     c.env.DB.prepare(
       `
@@ -689,22 +828,50 @@ app.post('/api/requests', async (c) => {
     )
   }
 
+  const pushRecipients = members.results.filter((row) => row.id !== data.senderMemberId).map((row) => row.id)
+  for (const recipientId of pushRecipients) {
+    batchStatements.push(
+      c.env.DB.prepare(
+        `
+        INSERT INTO push_notifications (
+          id,
+          group_id,
+          recipient_member_id,
+          request_id,
+          kind,
+          sender_member_id,
+          sender_name,
+          store_name,
+          items_summary
+        )
+        VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?)
+        `
+      ).bind(
+        crypto.randomUUID(),
+        data.groupId,
+        recipientId,
+        requestId,
+        data.senderMemberId,
+        member.displayName,
+        storeName,
+        itemsSummary
+      )
+    )
+  }
+
   await c.env.DB.batch(batchStatements)
 
-  const itemNameMap = new Map(
-    availableItems.map((item) => [item.id, localizeSystemItemName(item.id, item.name, language)])
-  )
-  const readableItems = [...qtyByItem.entries()].map(([itemId, qty]) => {
-    const itemName = itemNameMap.get(itemId) ?? (language === 'ja' ? '不明' : 'Unknown')
-    return qty > 1 ? `${itemName} x${qty}` : itemName
-  })
   const pushMessage =
     language === 'ja'
-      ? `${member.displayName}さんが${storeName ? `${storeName}で` : ''}${readableItems.join('、')}を買ってほしいと言っています`
-      : `${member.displayName} is asking to buy ${readableItems.join(', ')}${storeName ? ` at ${storeName}` : ''}.`
+      ? `${member.displayName}さんから新しい依頼があります: ${itemsSummary}`
+      : `${member.displayName} has a new request: ${itemsSummary}`
 
-  const pushRecipients = members.results.filter((row) => row.id !== data.senderMemberId).map((row) => row.id)
   await fanoutPushNotifications(c, data.groupId, pushRecipients, pushMessage)
+  logInfo(c.env, 'push.request.enqueued', {
+    groupId: data.groupId,
+    requestId,
+    recipientCount: pushRecipients.length
+  })
 
   return c.json(
     {
@@ -813,6 +980,8 @@ app.post('/api/requests/:requestId/ack', async (c) => {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
   }
 
+  const beforeStatus = await readRequestStatus(c, requestId)
+
   await c.env.DB.batch([
     c.env.DB.prepare(
       `
@@ -834,17 +1003,33 @@ app.post('/api/requests/:requestId/ack', async (c) => {
   ])
 
   const status = await readRequestStatus(c, requestId)
-  if (status === 'acknowledged') {
+  if (beforeStatus !== status && status === 'acknowledged') {
+    const { storeName, itemsSummary } = await buildRequestSummary(c.env, requestId, language)
+
+    await enqueuePushNotifications(c.env, {
+      groupId: ownsInboxEvent.groupId,
+      requestId,
+      kind: 'acknowledged',
+      senderMemberId: member.id,
+      senderName: member.displayName,
+      recipientMemberIds: [ownsInboxEvent.senderMemberId],
+      storeName,
+      itemsSummary
+    })
+
     const pushMessage =
       language === 'ja'
-        ? `${member.displayName}さんが依頼を対応中にしました`
-        : `${member.displayName} marked your request as In progress.`
-    try {
-      await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
-    } catch (error) {
-      console.error('[push:ack] failed', error)
-    }
+        ? `${member.displayName}さんが依頼を対応中にしました: ${itemsSummary}`
+        : `${member.displayName} marked your request as In progress: ${itemsSummary}`
+
+    await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
+    logInfo(c.env, 'push.ack.enqueued', {
+      groupId: ownsInboxEvent.groupId,
+      requestId,
+      recipientCount: 1
+    })
   }
+
   return c.json({ requestId, status })
 })
 
@@ -872,6 +1057,8 @@ app.post('/api/requests/:requestId/complete', async (c) => {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
   }
 
+  const beforeStatus = await readRequestStatus(c, requestId)
+
   await c.env.DB.batch([
     c.env.DB.prepare(
       `
@@ -890,17 +1077,33 @@ app.post('/api/requests/:requestId/complete', async (c) => {
   ])
 
   const status = await readRequestStatus(c, requestId)
-  if (status === 'completed') {
+  if (beforeStatus !== status && status === 'completed') {
+    const { storeName, itemsSummary } = await buildRequestSummary(c.env, requestId, language)
+
+    await enqueuePushNotifications(c.env, {
+      groupId: ownsInboxEvent.groupId,
+      requestId,
+      kind: 'completed',
+      senderMemberId: member.id,
+      senderName: member.displayName,
+      recipientMemberIds: [ownsInboxEvent.senderMemberId],
+      storeName,
+      itemsSummary
+    })
+
     const pushMessage =
       language === 'ja'
-        ? `${member.displayName}さんが依頼を購入完了にしました`
-        : `${member.displayName} marked your request as Completed.`
-    try {
-      await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
-    } catch (error) {
-      console.error('[push:complete] failed', error)
-    }
+        ? `${member.displayName}さんが依頼を購入完了にしました: ${itemsSummary}`
+        : `${member.displayName} marked your request as Completed: ${itemsSummary}`
+
+    await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
+    logInfo(c.env, 'push.complete.enqueued', {
+      groupId: ownsInboxEvent.groupId,
+      requestId,
+      recipientCount: 1
+    })
   }
+
   return c.json({ requestId, status })
 })
 
@@ -915,8 +1118,12 @@ app.get('/api/quota/status', async (c) => {
 })
 
 app.onError((error, c) => {
-  console.error('--- API Error ---');
-  console.error(error);
+  logError(c.env, 'api.error', {
+    path: c.req.path,
+    method: c.req.method,
+    name: error.name,
+    message: error.message
+  })
   if (error instanceof HTTPException) {
     const body: ApiError = {
       code: error.message || 'HTTP_ERROR',
@@ -959,6 +1166,108 @@ function mapStore(row: DbStore, language: CatalogLanguage): StoreButton {
     isSystem: !!row.isSystem,
     sortOrder: Number(row.sortOrder)
   }
+}
+
+function buildItemsSummary(items: string[], storeName: string | null, language: CatalogLanguage): string {
+  const head = items.slice(0, 2)
+  const rest = Math.max(0, items.length - head.length)
+  if (language === 'ja') {
+    const core = head.join('、')
+    const withRest = rest > 0 ? `${core} ほか${rest}件` : core
+    return storeName ? `${storeName}で ${withRest}` : withRest
+  }
+  const core = head.join(', ')
+  const withRest = rest > 0 ? `${core} +${rest} more` : core
+  return storeName ? `at ${storeName}: ${withRest}` : withRest
+}
+
+async function buildRequestSummary(
+  env: Env,
+  requestId: string,
+  language: CatalogLanguage
+): Promise<{ storeName: string | null; itemsSummary: string }> {
+  const requestStore = await env.DB.prepare(
+    `
+    SELECT r.store_id AS storeId, s.name AS storeName
+    FROM requests r
+    LEFT JOIN stores s ON s.id = r.store_id
+    WHERE r.id = ?
+    `
+  )
+    .bind(requestId)
+    .first<DbRequestStoreRow>()
+
+  const itemRows = await env.DB.prepare(
+    `
+    SELECT i.id, i.name, ri.qty AS qty, i.sort_order AS sortOrder
+    FROM request_items ri
+    JOIN items i ON i.id = ri.item_id
+    WHERE ri.request_id = ?
+    ORDER BY i.sort_order ASC
+    `
+  )
+    .bind(requestId)
+    .all<DbRequestItemNameRow & { id: string }>()
+
+  const readableItems = itemRows.results.map((row) => {
+    const localizedName = localizeSystemItemName(row.id, row.name, language)
+    const qty = Number(row.qty)
+    return qty > 1 ? `${localizedName} x${qty}` : localizedName
+  })
+
+  const localizedStoreName = requestStore?.storeId
+    ? localizeSystemStoreName(requestStore.storeId, requestStore.storeName ?? '', language)
+    : requestStore?.storeName ?? null
+
+  return {
+    storeName: localizedStoreName,
+    itemsSummary: buildItemsSummary(readableItems, localizedStoreName, language)
+  }
+}
+
+async function enqueuePushNotifications(
+  env: Env,
+  input: {
+    groupId: string
+    requestId: string
+    kind: RequestStatus
+    senderMemberId: string
+    senderName: string
+    recipientMemberIds: string[]
+    storeName: string | null
+    itemsSummary: string
+  }
+): Promise<void> {
+  if (input.recipientMemberIds.length === 0) return
+  const statements = input.recipientMemberIds.map((recipientId) =>
+    env.DB.prepare(
+      `
+      INSERT INTO push_notifications (
+        id,
+        group_id,
+        recipient_member_id,
+        request_id,
+        kind,
+        sender_member_id,
+        sender_name,
+        store_name,
+        items_summary
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    ).bind(
+      crypto.randomUUID(),
+      input.groupId,
+      recipientId,
+      input.requestId,
+      input.kind,
+      input.senderMemberId,
+      input.senderName,
+      input.storeName,
+      input.itemsSummary
+    )
+  )
+  await env.DB.batch(statements)
 }
 
 function readCatalogLanguage(req: { header: (name: string) => string | undefined }): CatalogLanguage {
@@ -1196,10 +1505,19 @@ async function fanoutPushNotifications(
   recipientMemberIds: string[],
   message: string
 ): Promise<void> {
-  if (recipientMemberIds.length === 0) return
-  if (!c.env.VAPID_PUBLIC_KEY || !c.env.VAPID_PRIVATE_KEY || !c.env.VAPID_SUBJECT) {
+  if (recipientMemberIds.length === 0) {
+    logDebug(c.env, 'push.fanout.skipped.no_recipients', { groupId })
     return
   }
+  if (!c.env.VAPID_PUBLIC_KEY || !c.env.VAPID_PRIVATE_KEY || !c.env.VAPID_SUBJECT) {
+    logWarn(c.env, 'push.fanout.skipped.missing_vapid', { groupId, recipientCount: recipientMemberIds.length })
+    return
+  }
+
+  logDebug(c.env, 'push.fanout.start', {
+    groupId,
+    recipientCount: recipientMemberIds.length
+  })
 
   const placeholders = createInClause(recipientMemberIds.length)
   const subscriptions = await c.env.DB.prepare(
@@ -1212,7 +1530,16 @@ async function fanoutPushNotifications(
     .bind(...recipientMemberIds)
     .all<PushSubscriptionRecord>()
 
+  logDebug(c.env, 'push.fanout.subscriptions_loaded', {
+    groupId,
+    recipientCount: recipientMemberIds.length,
+    subscriptionCount: subscriptions.results.length
+  })
+
   const staleEndpoints: string[] = []
+  let deliveredCount = 0
+  let failedCount = 0
+  let expiredCount = 0
   await Promise.all(
     subscriptions.results.map(async (subscription) => {
       try {
@@ -1221,10 +1548,21 @@ async function fanoutPushNotifications(
           privateKey: c.env.VAPID_PRIVATE_KEY as string,
           subject: c.env.VAPID_SUBJECT as string
         })
+        if (result.ok) {
+          deliveredCount += 1
+        } else {
+          failedCount += 1
+        }
         if (result.expired) {
           staleEndpoints.push(subscription.endpoint)
+          expiredCount += 1
         }
-      } catch {
+      } catch (error) {
+        failedCount += 1
+        logWarn(c.env, 'push.fanout.send_failed', {
+          groupId,
+          errorName: error instanceof Error ? error.name : 'UnknownError'
+        })
         // Ignore push network/signing failures to keep request creation reliable.
       }
     })
@@ -1237,7 +1575,20 @@ async function fanoutPushNotifications(
     )
       .bind(...staleEndpoints)
       .run()
+    logInfo(c.env, 'push.fanout.cleaned_stale_subscriptions', {
+      groupId,
+      staleCount: staleEndpoints.length
+    })
   }
+
+  logInfo(c.env, 'push.fanout.done', {
+    groupId,
+    recipientCount: recipientMemberIds.length,
+    subscriptionCount: subscriptions.results.length,
+    deliveredCount,
+    failedCount,
+    expiredCount
+  })
 
   // Persisting this string keeps parity with user-facing text generation requirements.
   void message
@@ -1561,6 +1912,62 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
   }
 }
 
+async function purgeDeliveredPushNotifications(env: Env): Promise<void> {
+  const retentionDays = resolveCompletedRetentionDays(env)
+  if (!retentionDays) return
+
+  const maxDeletePerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_DELETE_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_DELETE_PER_RUN
+  )
+  const maxBatchesPerRun = resolveMaintenanceLimit(
+    env.MAINTENANCE_MAX_BATCHES_PER_RUN,
+    DEFAULT_MAINTENANCE_MAX_BATCHES_PER_RUN
+  )
+  const cutoffIso = getCompletedCutoffIso(retentionDays)
+  let deletedCount = 0
+  let batchCount = 0
+
+  while (true) {
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) break
+
+    const rows = await env.DB.prepare(
+      `
+      SELECT id
+      FROM push_notifications
+      WHERE delivered_at IS NOT NULL
+        AND delivered_at < ?
+      ORDER BY delivered_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(cutoffIso, PUSH_NOTIFICATION_PURGE_BATCH_SIZE)
+      .all<{ id: string }>()
+    batchCount += 1
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) break
+
+    const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
+    const availableIds = ids.slice(0, remainingDeleteBudget)
+    if (availableIds.length === 0) break
+
+    const placeholders = createInClause(availableIds.length)
+    await env.DB.prepare(`DELETE FROM push_notifications WHERE id IN (${placeholders})`)
+      .bind(...availableIds)
+      .run()
+    deletedCount += availableIds.length
+
+    if (availableIds.length < ids.length || ids.length < PUSH_NOTIFICATION_PURGE_BATCH_SIZE) break
+  }
+
+  if (deletedCount > 0) {
+    logInfo(env, 'maintenance.push_notifications.purged', { deletedCount })
+  } else {
+    logDebug(env, 'maintenance.push_notifications.purged', { deletedCount: 0 })
+  }
+}
+
 async function markUnusedGroups(
   env: Env,
   candidateCutoffIso: string,
@@ -1728,6 +2135,7 @@ async function cleanupUnusedGroups(env: Env): Promise<void> {
 
 async function runDailyMaintenance(env: Env): Promise<void> {
   await purgeOldCompletedRequests(env)
+  await purgeDeliveredPushNotifications(env)
   await purgeArchivedCustomCatalog(env)
   await cleanupUnusedGroups(env)
 }
@@ -1743,3 +2151,7 @@ const worker = {
 
 export default worker
 export { QuotaGateDO }
+
+
+
+

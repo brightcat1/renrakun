@@ -12,6 +12,7 @@ export interface Env {
   UNUSED_GROUP_DELETE_GRACE_DAYS?: string
   MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN?: string
   MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN?: string
+  LOG_LEVEL?: string
   APP_ORIGIN: string
   VAPID_PUBLIC_KEY?: string
   VAPID_PRIVATE_KEY?: string
@@ -73,4 +74,26 @@ export interface DbRequestItemRow {
   itemId: string
   name: string
   qty: number
+}
+
+export interface DbPushPendingRow {
+  id: string
+  requestId: string
+  kind: RequestStatus
+  senderMemberId: string
+  senderName: string
+  storeName: string | null
+  itemsSummary: string
+  createdAt: string
+}
+
+export interface DbRequestItemNameRow {
+  name: string
+  qty: number
+  sortOrder: number
+}
+
+export interface DbRequestStoreRow {
+  storeId: string | null
+  storeName: string | null
 }

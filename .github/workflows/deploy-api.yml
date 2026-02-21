@@ -67,7 +67,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
           wranglerVersion: "4.67.0"
-          command: d1 execute renrakun --remote --file=./migrations/0002_seed_system_catalog.sql
+          command: d1 execute renrakun --remote --file=./migrations/0002_seed_system_catalog.sql --yes
 
       - name: Deploy API
         uses: cloudflare/wrangler-action@v3
