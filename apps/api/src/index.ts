@@ -29,11 +29,53 @@ const PASSHASH_PREFIX = 'pbkdf2_sha256'
 const PASSHASH_ITERATIONS = 50000
 const PASSHASH_SALT_BYTES = 16
 const PASSHASH_KEY_BYTES = 32
-const DEFAULT_COMPLETED_RETENTION_DAYS = 30
+const DEFAULT_COMPLETED_RETENTION_DAYS = 14
 const DEFAULT_MAINTENANCE_MAX_DELETE_PER_RUN = 2000
 const DEFAULT_MAINTENANCE_MAX_BATCHES_PER_RUN = 20
+const DEFAULT_UNUSED_GROUP_CANDIDATE_DAYS = 60
+const DEFAULT_UNUSED_GROUP_DELETE_GRACE_DAYS = 30
+const DEFAULT_MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN = 200
+const DEFAULT_MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN = 10
 const COMPLETED_PURGE_BATCH_SIZE = 200
+const UNUSED_GROUP_CLEANUP_BATCH_SIZE = 50
+const DAY_IN_MS = 24 * 60 * 60 * 1000
 type CatalogLanguage = 'ja' | 'en'
+
+const UNUSED_GROUP_CANDIDATE_SQL = `
+  g.created_at < ?
+  AND NOT EXISTS (
+    SELECT 1
+    FROM requests r
+    WHERE r.group_id = g.id
+      AND r.status IN ('requested', 'acknowledged')
+  )
+  AND (
+    SELECT COUNT(*)
+    FROM members m
+    WHERE m.group_id = g.id
+  ) = 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM members m
+    JOIN push_subscriptions ps ON ps.member_id = m.id
+    WHERE m.group_id = g.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM tabs t
+    WHERE t.group_id = g.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM items i
+    WHERE i.group_id = g.id
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM stores s
+    WHERE s.group_id = g.id
+  )
+`
 
 const SYSTEM_TAB_LABELS: Record<string, Record<CatalogLanguage, string>> = {
   'sys-tab-detergent': { ja: '洗剤', en: 'Detergent' },
@@ -708,6 +750,7 @@ app.get('/api/requests/inbox', async (c) => {
 })
 
 app.post('/api/requests/:requestId/ack', async (c) => {
+  const language = readCatalogLanguage(c.req)
   const quotaBlocked = await checkDailyWriteQuota(c)
   if (quotaBlocked) return quotaBlocked
 
@@ -717,14 +760,14 @@ app.post('/api/requests/:requestId/ack', async (c) => {
   const requestId = c.req.param('requestId')
   const ownsInboxEvent = await c.env.DB.prepare(
     `
-    SELECT r.id, r.group_id AS groupId
+    SELECT r.id, r.group_id AS groupId, r.sender_member_id AS senderMemberId
     FROM requests r
     JOIN inbox_events ie ON ie.request_id = r.id
     WHERE r.id = ? AND ie.recipient_member_id = ? AND r.sender_member_id <> ?
     `
   )
     .bind(requestId, member.id, member.id)
-    .first<{ id: string; groupId: string }>()
+    .first<{ id: string; groupId: string; senderMemberId: string }>()
 
   if (!ownsInboxEvent) {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
@@ -751,10 +794,22 @@ app.post('/api/requests/:requestId/ack', async (c) => {
   ])
 
   const status = await readRequestStatus(c, requestId)
+  if (status === 'acknowledged') {
+    const pushMessage =
+      language === 'ja'
+        ? `${member.displayName}さんが依頼を対応中にしました`
+        : `${member.displayName} marked your request as In progress.`
+    try {
+      await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
+    } catch (error) {
+      console.error('[push:ack] failed', error)
+    }
+  }
   return c.json({ requestId, status })
 })
 
 app.post('/api/requests/:requestId/complete', async (c) => {
+  const language = readCatalogLanguage(c.req)
   const quotaBlocked = await checkDailyWriteQuota(c)
   if (quotaBlocked) return quotaBlocked
 
@@ -764,14 +819,14 @@ app.post('/api/requests/:requestId/complete', async (c) => {
   const requestId = c.req.param('requestId')
   const ownsInboxEvent = await c.env.DB.prepare(
     `
-    SELECT r.id
+    SELECT r.id, r.group_id AS groupId, r.sender_member_id AS senderMemberId
     FROM requests r
     JOIN inbox_events ie ON ie.request_id = r.id
     WHERE r.id = ? AND ie.recipient_member_id = ? AND r.sender_member_id <> ?
     `
   )
     .bind(requestId, member.id, member.id)
-    .first<{ id: string }>()
+    .first<{ id: string; groupId: string; senderMemberId: string }>()
 
   if (!ownsInboxEvent) {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
@@ -795,6 +850,17 @@ app.post('/api/requests/:requestId/complete', async (c) => {
   ])
 
   const status = await readRequestStatus(c, requestId)
+  if (status === 'completed') {
+    const pushMessage =
+      language === 'ja'
+        ? `${member.displayName}さんが依頼を購入完了にしました`
+        : `${member.displayName} marked your request as Completed.`
+    try {
+      await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
+    } catch (error) {
+      console.error('[push:complete] failed', error)
+    }
+  }
   return c.json({ requestId, status })
 })
 
@@ -1280,8 +1346,33 @@ function resolveMaintenanceLimit(raw: string | undefined, fallback: number): num
   return Math.max(1, Math.floor(parsed))
 }
 
+function resolveUnusedGroupCandidateDays(env: Env): number {
+  return resolveMaintenanceLimit(env.UNUSED_GROUP_CANDIDATE_DAYS, DEFAULT_UNUSED_GROUP_CANDIDATE_DAYS)
+}
+
+function resolveUnusedGroupGraceDays(env: Env): number {
+  return resolveMaintenanceLimit(env.UNUSED_GROUP_DELETE_GRACE_DAYS, DEFAULT_UNUSED_GROUP_DELETE_GRACE_DAYS)
+}
+
+function resolveUnusedGroupMaintenanceLimits(env: Env): { maxGroupsPerRun: number; maxBatchesPerRun: number } {
+  return {
+    maxGroupsPerRun: resolveMaintenanceLimit(
+      env.MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN,
+      DEFAULT_MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN
+    ),
+    maxBatchesPerRun: resolveMaintenanceLimit(
+      env.MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN,
+      DEFAULT_MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN
+    )
+  }
+}
+
+function getIsoWithDayOffset(daysOffset: number): string {
+  return new Date(Date.now() + daysOffset * DAY_IN_MS).toISOString()
+}
+
 function getCompletedCutoffIso(retentionDays: number): string {
-  return new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+  return getIsoWithDayOffset(-retentionDays)
 }
 
 async function purgeOldCompletedRequests(env: Env): Promise<void> {
@@ -1430,9 +1521,175 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
   }
 }
 
+async function markUnusedGroups(
+  env: Env,
+  candidateCutoffIso: string,
+  graceDays: number,
+  maxGroupsPerRun: number,
+  maxBatchesPerRun: number
+): Promise<void> {
+  let markedCount = 0
+  let batchCount = 0
+
+  while (true) {
+    if (markedCount >= maxGroupsPerRun || batchCount >= maxBatchesPerRun) return
+
+    const remainingBudget = maxGroupsPerRun - markedCount
+    const batchSize = Math.min(UNUSED_GROUP_CLEANUP_BATCH_SIZE, remainingBudget)
+    if (batchSize <= 0) return
+
+    const rows = await env.DB.prepare(
+      `
+      SELECT g.id
+      FROM groups g
+      WHERE g.cleanup_marked_at IS NULL
+        AND ${UNUSED_GROUP_CANDIDATE_SQL}
+      ORDER BY g.created_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(candidateCutoffIso, batchSize)
+      .all<{ id: string }>()
+    batchCount += 1
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) return
+
+    const placeholders = createInClause(ids.length)
+    const markedAtIso = nowIso()
+    const scheduledDeleteIso = getIsoWithDayOffset(graceDays)
+    await env.DB.prepare(
+      `
+      UPDATE groups
+      SET cleanup_marked_at = ?, cleanup_scheduled_delete_at = ?
+      WHERE id IN (${placeholders})
+        AND cleanup_marked_at IS NULL
+      `
+    )
+      .bind(markedAtIso, scheduledDeleteIso, ...ids)
+      .run()
+    markedCount += ids.length
+
+    if (ids.length < batchSize) return
+  }
+}
+
+async function unmarkReactivatedGroups(
+  env: Env,
+  candidateCutoffIso: string,
+  maxGroupsPerRun: number,
+  maxBatchesPerRun: number
+): Promise<void> {
+  let unmarkedCount = 0
+  let batchCount = 0
+
+  while (true) {
+    if (unmarkedCount >= maxGroupsPerRun || batchCount >= maxBatchesPerRun) return
+
+    const remainingBudget = maxGroupsPerRun - unmarkedCount
+    const batchSize = Math.min(UNUSED_GROUP_CLEANUP_BATCH_SIZE, remainingBudget)
+    if (batchSize <= 0) return
+
+    const rows = await env.DB.prepare(
+      `
+      SELECT g.id
+      FROM groups g
+      WHERE g.cleanup_marked_at IS NOT NULL
+        AND NOT (${UNUSED_GROUP_CANDIDATE_SQL})
+      ORDER BY g.cleanup_marked_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(candidateCutoffIso, batchSize)
+      .all<{ id: string }>()
+    batchCount += 1
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) return
+
+    const placeholders = createInClause(ids.length)
+    await env.DB.prepare(
+      `
+      UPDATE groups
+      SET cleanup_marked_at = NULL,
+          cleanup_scheduled_delete_at = NULL
+      WHERE id IN (${placeholders})
+      `
+    )
+      .bind(...ids)
+      .run()
+    unmarkedCount += ids.length
+
+    if (ids.length < batchSize) return
+  }
+}
+
+async function purgeUnusedGroupsDue(
+  env: Env,
+  candidateCutoffIso: string,
+  maxGroupsPerRun: number,
+  maxBatchesPerRun: number
+): Promise<void> {
+  let deletedCount = 0
+  let batchCount = 0
+  const dueIso = nowIso()
+
+  while (true) {
+    if (deletedCount >= maxGroupsPerRun || batchCount >= maxBatchesPerRun) return
+
+    const remainingBudget = maxGroupsPerRun - deletedCount
+    const batchSize = Math.min(UNUSED_GROUP_CLEANUP_BATCH_SIZE, remainingBudget)
+    if (batchSize <= 0) return
+
+    const rows = await env.DB.prepare(
+      `
+      SELECT g.id
+      FROM groups g
+      WHERE g.cleanup_scheduled_delete_at IS NOT NULL
+        AND g.cleanup_scheduled_delete_at <= ?
+        AND ${UNUSED_GROUP_CANDIDATE_SQL}
+      ORDER BY g.cleanup_scheduled_delete_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(dueIso, candidateCutoffIso, batchSize)
+      .all<{ id: string }>()
+    batchCount += 1
+
+    const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) return
+
+    const placeholders = createInClause(ids.length)
+    await env.DB.prepare(`DELETE FROM groups WHERE id IN (${placeholders})`)
+      .bind(...ids)
+      .run()
+    deletedCount += ids.length
+
+    if (ids.length < batchSize) return
+  }
+}
+
+async function cleanupUnusedGroups(env: Env): Promise<void> {
+  const candidateDays = resolveUnusedGroupCandidateDays(env)
+  const graceDays = resolveUnusedGroupGraceDays(env)
+  const limits = resolveUnusedGroupMaintenanceLimits(env)
+  const candidateCutoffIso = getCompletedCutoffIso(candidateDays)
+
+  await markUnusedGroups(
+    env,
+    candidateCutoffIso,
+    graceDays,
+    limits.maxGroupsPerRun,
+    limits.maxBatchesPerRun
+  )
+  await unmarkReactivatedGroups(env, candidateCutoffIso, limits.maxGroupsPerRun, limits.maxBatchesPerRun)
+  await purgeUnusedGroupsDue(env, candidateCutoffIso, limits.maxGroupsPerRun, limits.maxBatchesPerRun)
+}
+
 async function runDailyMaintenance(env: Env): Promise<void> {
   await purgeOldCompletedRequests(env)
   await purgeArchivedCustomCatalog(env)
+  await cleanupUnusedGroups(env)
 }
 
 const worker = {

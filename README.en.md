@@ -7,7 +7,7 @@ It keeps shopping requests out of daily chat noise by using a dedicated ordering
 
 - Touch-panel UI to add household items and send requests quickly
 - Push notifications + in-app inbox for group members
-- Request status flow: `requested` / `acknowledged` / `completed`
+- Request status flow: `Requested` / `In progress` / `Completed`
 - Admin-only custom tabs and custom item buttons per group
 - Daily free-tier guard: write APIs pause on quota and auto-resume at 00:00 JST
 
@@ -93,6 +93,7 @@ pnpm wrangler d1 migrations apply renrakun --local
 ```
 
 `--local` applies to local D1 state under `.wrangler/state`, not to Cloudflare production D1.
+- If the UI shows "Could not load data", check migration apply status and API logs before resetting any DB.
 
 4. Run development servers:
 
@@ -124,8 +125,10 @@ npx wrangler secret put VAPID_SUBJECT
 
 - If `VAPID_SUBJECT` is stored as a Secret, you do not need to hardcode an email in `wrangler.toml`.
 - Request creation still works without `VAPID_*`, but Web Push delivery is skipped.
-- Completed request retention can be tuned with `COMPLETED_RETENTION_DAYS` (default: `30` days). Use `0` or below to disable auto-purge.
+- Completed request retention can be tuned with `COMPLETED_RETENTION_DAYS` (default: `14` days). Use `0` or below to disable auto-purge.
 - Daily maintenance also uses capped guardrails for free-tier protection: `MAINTENANCE_MAX_DELETE_PER_RUN` (default `2000`) and `MAINTENANCE_MAX_BATCHES_PER_RUN` (default `20`), while deletion criteria follow the `COMPLETED_RETENTION_DAYS` setting.
+- Unused groups are cleaned with a balanced policy (older than 60 days, zero open requests, one member, zero push subscriptions, and zero custom tabs/items/stores): they are first marked for deletion and then physically removed after a 30-day grace period. Tune with `UNUSED_GROUP_CANDIDATE_DAYS`, `UNUSED_GROUP_DELETE_GRACE_DAYS`, `MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN`, and `MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN`.
+- The app UI also shows this retention policy as a persistent banner, so users can confirm behavior without opening README.
 
 ## Use As PWA (End Users)
 
@@ -143,9 +146,9 @@ This repository implements an automated CI/CD pipeline using GitHub Actions and 
 ## How to use (Dev flow)
 
 1. Create a group in the web app (display name + passphrase).
-2. Share the invite token with your family member.
+2. Share the invite link with your family member (manual token input is still available as fallback).
 3. Select tab -> tap items -> optionally choose store -> send.
-4. Receiver marks the request as `acknowledged`, then `completed`.
+4. Receiver marks the request as `In progress`, then `Completed`.
 
 ## Why not just use chat apps?
 
@@ -158,5 +161,5 @@ This repository implements an automated CI/CD pipeline using GitHub Actions and 
 
 - **Push notifications**: On iOS, Web Push availability depends on OS version, Home Screen installation status, and notification permission settings.
 - **Write limits**: To stay within Cloudflare free-tier limits, write APIs are rate-limited after the daily cap is reached (auto-resets at 00:00 JST).
-- **History cleanup**: Completed requests are auto-purged after 30 days by default (`COMPLETED_RETENTION_DAYS` can override this).
+- **History cleanup**: Requests marked `Completed` are auto-purged after 14 days by default (`COMPLETED_RETENTION_DAYS` can override this). `Requested` / `In progress` are not auto-purged.
 - **Scope**: This MVP does not include features such as price comparison, inventory management, or external e-commerce integrations.

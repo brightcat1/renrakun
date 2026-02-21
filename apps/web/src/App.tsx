@@ -46,8 +46,12 @@ interface Messages {
   defaultDisplayName: string
   passphrase: string
   passphrasePlaceholder: string
+  passphraseHint: string
   inviteToken: string
   inviteTokenPlaceholder: string
+  inviteEntryTitle: string
+  inviteEntryLead: string
+  switchToManualJoin: string
   createAction: string
   joinAction: string
   fixedCatalog: string
@@ -57,8 +61,14 @@ interface Messages {
   enableNotifications: string
   leaveGroup: string
   quotaPaused: (resumeAt: string) => string
-  inviteTokenLabel: string
-  copyToken: string
+  retentionBannerTitle: string
+  retentionBannerSummary: string
+  retentionBannerDetailsTitle: string
+  retentionBannerDetailsPoints: string[]
+  inviteLinkLabel: string
+  copyInviteLink: string
+  touchLoading: string
+  touchEmpty: string
   inboxTitle: string
   inboxFilterOpen: string
   inboxFilterAll: string
@@ -126,7 +136,7 @@ interface Messages {
     itemAdded: (name: string) => string
     tabDeleted: (name: string) => string
     itemDeleted: (name: string) => string
-    tokenCopied: string
+    inviteLinkCopied: string
   }
 }
 
@@ -145,8 +155,12 @@ const MESSAGES: Record<Language, Messages> = {
     defaultDisplayName: 'ゲスト',
     passphrase: '合言葉',
     passphrasePlaceholder: '6文字以上',
-    inviteToken: '招待トークン',
-    inviteTokenPlaceholder: '共有されたトークン',
+    passphraseHint: '6文字以上（日本語・英数字どちらでも可）',
+    inviteToken: '招待リンクまたはトークン',
+    inviteTokenPlaceholder: '例: https://.../?invite=... またはトークン',
+    inviteEntryTitle: '招待リンクから参加',
+    inviteEntryLead: '表示名と合言葉を入力すると、このグループに参加できます。',
+    switchToManualJoin: '手動でトークン入力に切り替える',
     createAction: 'グループを作る',
     joinAction: 'グループに参加する',
     fixedCatalog: '固定カタログ',
@@ -156,8 +170,18 @@ const MESSAGES: Record<Language, Messages> = {
     enableNotifications: '通知を有効化',
     leaveGroup: 'グループ退出',
     quotaPaused: (resumeAt) => `無料枠上限のため書き込み機能を一時停止中です。再開予定: ${resumeAt}（JST基準）`,
-    inviteTokenLabel: '招待トークン',
-    copyToken: 'トークンをコピー',
+    retentionBannerTitle: '履歴の保存期間',
+    retentionBannerSummary: '未対応の依頼は残ります。完了した依頼は14日後に自動で削除されます。',
+    retentionBannerDetailsTitle: '詳細を見る',
+    retentionBannerDetailsPoints: [
+      '「依頼中」「対応中」の依頼は自動では削除されません。',
+      '「購入完了」にした依頼は、リストが長くなりすぎないよう14日後に自動で削除されます。',
+      '長期間使われていないグループは段階的に整理されます。'
+    ],
+    inviteLinkLabel: '招待リンク',
+    copyInviteLink: '招待リンクをコピー',
+    touchLoading: '項目を読み込み中です。',
+    touchEmpty: '表示できる項目がありません。更新して再度お試しください。',
     inboxTitle: '受信箱',
     inboxFilterOpen: '未完了',
     inboxFilterAll: 'すべて',
@@ -168,25 +192,25 @@ const MESSAGES: Record<Language, Messages> = {
     requestOtherSuffix: 'を買ってほしいと言っています',
     ack: '対応する',
     complete: '購入完了',
-    adminTitle: '管理者設定',
-    adminLead: '通常利用者は入力不要。ここだけ管理者がカスタム追加できます。',
-    newTab: '新しいタブ',
-    newTabPlaceholder: '例: 洗濯',
-    addTab: 'タブ追加',
-    itemTargetTab: 'ボタン追加先',
-    newItem: '新しいボタン名',
-    newItemPlaceholder: '例: 柔軟剤',
-    addItem: 'ボタン追加',
-    customTabsSection: 'カスタムタブ管理',
-    customItemsSection: 'カスタムボタン管理',
-    noCustomTabs: '削除可能なカスタムタブはありません',
-    noCustomItems: 'このタブに削除可能なカスタムボタンはありません',
+    adminTitle: 'グループ専用アイテムの追加',
+    adminLead: 'このグループを作成した人のみ、タブやアイテムを追加・管理できます。',
+    newTab: '新しいタブ名',
+    newTabPlaceholder: '例: 日用品',
+    addTab: 'タブを追加',
+    itemTargetTab: '追加先のタブ',
+    newItem: '新しいアイテム名',
+    newItemPlaceholder: '例: 食洗機用洗剤',
+    addItem: 'アイテムを追加',
+    customTabsSection: '追加したタブの削除',
+    customItemsSection: '追加したアイテムの削除',
+    noCustomTabs: '削除できるタブはありません',
+    noCustomItems: 'このタブに削除できるアイテムはありません',
     deleteAction: '削除',
     deleteCancel: '取り消し',
     deleteConfirm: '削除する',
     deleteModalTitle: '削除の確認',
     deleteModalBodyTab: (name) => `タブ「${name}」を削除します。よろしいですか？`,
-    deleteModalBodyItem: (name) => `ボタン「${name}」を削除します。よろしいですか？`,
+    deleteModalBodyItem: (name) => `アイテム「${name}」を削除します。よろしいですか？`,
     cartTitle: 'カート',
     cartEmpty: 'アイテムがありません',
     sendRequest: '依頼を送信する',
@@ -199,9 +223,9 @@ const MESSAGES: Record<Language, Messages> = {
     errors: {
       quotaReached: '無料枠の上限に達しました。翌日0:00 JSTに自動再開します。',
       profileRequired: '表示名と合言葉は必須です。',
-      inviteRequired: '参加には招待トークンが必要です。',
+      inviteRequired: '参加には招待リンクまたはトークンが必要です。',
       invalidSession: 'セッションが無効になりました。グループに入り直してください。',
-      loadFailed: 'データ読み込みに失敗しました。',
+      loadFailed: 'データを読み込めませんでした。更新して再度お試しください。',
       groupFailed: 'グループ操作に失敗しました',
       vapidMissing: 'VITE_VAPID_PUBLIC_KEY が未設定です。',
       pushFailed: '通知設定に失敗しました',
@@ -210,22 +234,22 @@ const MESSAGES: Record<Language, Messages> = {
       ackFailed: '対応中への更新に失敗しました',
       completeFailed: '購入完了への更新に失敗しました',
       addTabFailed: 'カスタムタブ追加に失敗しました',
-      addItemFailed: 'カスタムボタン追加に失敗しました',
+      addItemFailed: 'カスタムアイテム追加に失敗しました',
       clipboardFailed: 'クリップボードへコピーできませんでした。',
       deleteTabFailed: 'タブ削除に失敗しました',
-      deleteItemFailed: 'ボタン削除に失敗しました',
+      deleteItemFailed: 'アイテム削除に失敗しました',
       tabInUse: 'このタブは過去の依頼に含まれているため削除できません。',
-      itemInUse: 'このボタンは過去の依頼に含まれているため削除できません。'
+      itemInUse: 'このアイテムは過去の依頼に含まれているため削除できません。'
     },
     statusTexts: {
-      groupCreated: 'グループを作成しました。招待トークンを共有してください。',
+      groupCreated: 'グループを作成しました。招待リンクを共有してください。',
       groupJoined: 'グループに参加しました。',
       pushEnabled: '通知を有効化しました。',
       tabAdded: (name) => `タブ「${name}」を追加しました。`,
-      itemAdded: (name) => `ボタン「${name}」を追加しました。`,
+      itemAdded: (name) => `アイテム「${name}」を追加しました。`,
       tabDeleted: (name) => `タブ「${name}」を削除しました。`,
-      itemDeleted: (name) => `ボタン「${name}」を削除しました。`,
-      tokenCopied: '招待トークンをコピーしました。'
+      itemDeleted: (name) => `アイテム「${name}」を削除しました。`,
+      inviteLinkCopied: '招待リンクをコピーしました。'
     }
   },
   en: {
@@ -239,8 +263,12 @@ const MESSAGES: Record<Language, Messages> = {
     defaultDisplayName: 'Guest',
     passphrase: 'Passphrase',
     passphrasePlaceholder: '6+ characters',
-    inviteToken: 'Invite token',
-    inviteTokenPlaceholder: 'Shared invite token',
+    passphraseHint: '6+ characters (Japanese or alphanumeric)',
+    inviteToken: 'Invite link or token',
+    inviteTokenPlaceholder: 'e.g. https://.../?invite=... or token',
+    inviteEntryTitle: 'Join from invite link',
+    inviteEntryLead: 'Enter your display name and passphrase to join this group.',
+    switchToManualJoin: 'Switch to manual token input',
     createAction: 'Create group',
     joinAction: 'Join group',
     fixedCatalog: 'Built-in catalog',
@@ -250,8 +278,18 @@ const MESSAGES: Record<Language, Messages> = {
     enableNotifications: 'Enable notifications',
     leaveGroup: 'Leave group',
     quotaPaused: (resumeAt) => `Write APIs are paused by daily quota. Resume at: ${resumeAt} (JST)`,
-    inviteTokenLabel: 'Invite token',
-    copyToken: 'Copy token',
+    retentionBannerTitle: 'How history is kept',
+    retentionBannerSummary: 'Open requests stay. Completed requests are deleted after 14 days.',
+    retentionBannerDetailsTitle: 'View details',
+    retentionBannerDetailsPoints: [
+      'Requests in "Requested" or "In progress" are not auto-deleted.',
+      'Requests marked "Completed" are auto-deleted after 14 days to keep the list tidy.',
+      'Long-unused groups are cleaned up gradually.'
+    ],
+    inviteLinkLabel: 'Invite link',
+    copyInviteLink: 'Copy invite link',
+    touchLoading: 'Loading items...',
+    touchEmpty: 'No items to show. Please refresh and try again.',
     inboxTitle: 'Inbox',
     inboxFilterOpen: 'Active',
     inboxFilterAll: 'All',
@@ -262,19 +300,19 @@ const MESSAGES: Record<Language, Messages> = {
     requestOtherSuffix: ' needs this purchased.',
     ack: 'Acknowledge',
     complete: 'Complete',
-    adminTitle: 'Admin Settings',
-    adminLead: 'Regular users are tap-only. Admins can add custom tabs/items here.',
-    newTab: 'New tab',
-    newTabPlaceholder: 'e.g. Laundry',
+    adminTitle: 'Add group-only items',
+    adminLead: 'Only the person who created this group can add and manage tabs and items.',
+    newTab: 'New tab name',
+    newTabPlaceholder: 'e.g. Household',
     addTab: 'Add tab',
-    itemTargetTab: 'Target tab',
+    itemTargetTab: 'Tab to add into',
     newItem: 'New item name',
-    newItemPlaceholder: 'e.g. Fabric softener',
+    newItemPlaceholder: 'e.g. Dishwasher detergent',
     addItem: 'Add item',
-    customTabsSection: 'Custom tab management',
-    customItemsSection: 'Custom item management',
-    noCustomTabs: 'No custom tabs available to delete',
-    noCustomItems: 'No custom items in this tab to delete',
+    customTabsSection: 'Delete added tabs',
+    customItemsSection: 'Delete added items',
+    noCustomTabs: 'No added tabs to delete',
+    noCustomItems: 'No added items in this tab',
     deleteAction: 'Delete',
     deleteCancel: 'Cancel',
     deleteConfirm: 'Delete',
@@ -293,9 +331,9 @@ const MESSAGES: Record<Language, Messages> = {
     errors: {
       quotaReached: 'Daily free-tier quota reached. It will resume automatically at 00:00 JST.',
       profileRequired: 'Display name and passphrase are required.',
-      inviteRequired: 'Invite token is required to join.',
+      inviteRequired: 'Invite link or token is required to join.',
       invalidSession: 'Session is invalid. Please join the group again.',
-      loadFailed: 'Failed to load data.',
+      loadFailed: 'Could not load data. Please refresh in a moment.',
       groupFailed: 'Group operation failed',
       vapidMissing: 'VITE_VAPID_PUBLIC_KEY is missing.',
       pushFailed: 'Failed to enable notifications',
@@ -312,14 +350,14 @@ const MESSAGES: Record<Language, Messages> = {
       itemInUse: 'This item cannot be deleted because it is referenced by past requests.'
     },
     statusTexts: {
-      groupCreated: 'Group created. Share the invite token.',
+      groupCreated: 'Group created. Share the invite link.',
       groupJoined: 'Joined the group.',
       pushEnabled: 'Notifications enabled.',
       tabAdded: (name) => `Added tab: ${name}`,
       itemAdded: (name) => `Added item: ${name}`,
       tabDeleted: (name) => `Deleted tab: ${name}`,
       itemDeleted: (name) => `Deleted item: ${name}`,
-      tokenCopied: 'Invite token copied.'
+      inviteLinkCopied: 'Invite link copied.'
     }
   }
 }
@@ -358,6 +396,29 @@ function formatTime(iso: string, locale: string): string {
   })
 }
 
+function normalizeInviteInput(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+
+  try {
+    const base = typeof window === 'undefined' ? 'https://renrakun.pages.dev' : window.location.origin
+    const parsed = new URL(trimmed, base)
+    const fromQuery = parsed.searchParams.get('invite') ?? parsed.searchParams.get('token')
+    if (fromQuery && fromQuery.trim()) return fromQuery.trim()
+  } catch {
+    // Treat non-URL values as a direct token.
+  }
+
+  return trimmed
+}
+
+function buildInviteUrl(token: string): string {
+  if (typeof window === 'undefined') {
+    return `https://renrakun.pages.dev/?invite=${encodeURIComponent(token)}`
+  }
+  return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(token)}`
+}
+
 function isQuotaError(error: unknown): error is ApiClientError {
   return error instanceof ApiClientError && error.code === 'SERVICE_PAUSED_DAILY_QUOTA'
 }
@@ -385,6 +446,8 @@ export default function App() {
   const [statusText, setStatusText] = useState(() => MESSAGES[getInitialLanguage()].defaultStatus)
   const [errorText, setErrorText] = useState('')
   const [quotaResumeAt, setQuotaResumeAt] = useState<string | null>(null)
+  const [inviteFromLink, setInviteFromLink] = useState(false)
+  const [showManualJoinInput, setShowManualJoinInput] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
   )
@@ -398,6 +461,25 @@ export default function App() {
   useEffect(() => {
     setApiLanguage(language)
   }, [language])
+
+  useEffect(() => {
+    if (session || typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const inviteFromQuery = params.get('invite') ?? params.get('token')
+    if (!inviteFromQuery) return
+
+    const normalized = normalizeInviteInput(inviteFromQuery)
+    if (normalized) {
+      setJoinMode('join')
+      setInviteToken(normalized)
+      setInviteFromLink(true)
+      setShowManualJoinInput(false)
+    }
+
+    const cleanPath = `${window.location.pathname}${window.location.hash}`
+    window.history.replaceState(null, '', cleanPath || '/')
+  }, [session])
 
   const loadPublicCatalog = useCallback(async () => {
     try {
@@ -426,11 +508,30 @@ export default function App() {
     } catch (error) {
       if (isQuotaError(error)) {
         setQuotaResumeAt(error.resumeAt ?? null)
-      } else if (error instanceof ApiClientError && error.status === 401) {
-        setErrorText(messages.errors.invalidSession)
-        setSession(null)
-        clearSession()
+      } else if (error instanceof ApiClientError) {
+        console.error('[loadPrivateData] API error', {
+          status: error.status,
+          code: error.code,
+          detail: error.detail
+        })
+        if (
+          error.status === 401 ||
+          error.code === 'UNAUTHORIZED' ||
+          error.code === 'MEMBER_NOT_FOUND' ||
+          error.code === 'INVALID_SESSION'
+        ) {
+          setErrorText(messages.errors.invalidSession)
+          setSession(null)
+          clearSession()
+          setInviteFromLink(false)
+          setShowManualJoinInput(false)
+          setInviteToken('')
+          setJoinMode('create')
+        } else {
+          setErrorText(messages.errors.loadFailed)
+        }
       } else {
+        console.error('[loadPrivateData] unexpected error', error)
         setErrorText(messages.errors.loadFailed)
       }
     } finally {
@@ -519,6 +620,12 @@ export default function App() {
     () => (inboxFilter === 'all' ? inbox : inbox.filter((event) => event.status !== 'completed')),
     [inbox, inboxFilter]
   )
+  const inviteLink = useMemo(
+    () => (session?.inviteToken ? buildInviteUrl(session.inviteToken) : ''),
+    [session?.inviteToken]
+  )
+  const showInviteOnlyJoin = inviteFromLink && !showManualJoinInput
+  const inviteCopyLabel = messages.copyInviteLink || (language === 'ja' ? '招待リンクをコピー' : 'Copy invite link')
 
   const applyError = useCallback((error: unknown, fallback: string) => {
     if (isQuotaError(error)) {
@@ -533,7 +640,8 @@ export default function App() {
     setErrorText(fallback)
   }, [messages.errors.quotaReached])
 
-  const handleCreateOrJoin = useCallback(async () => {
+  const handleCreateOrJoin = useCallback(async (modeOverride?: JoinMode) => {
+    const mode = modeOverride ?? joinMode
     if (!displayName.trim() || !passphrase.trim()) {
       setErrorText(messages.errors.profileRequired)
       return
@@ -542,7 +650,7 @@ export default function App() {
     setErrorText('')
     setIsLoading(true)
     try {
-      if (joinMode === 'create') {
+      if (mode === 'create') {
         const result = await createGroup({
           deviceId,
           displayName,
@@ -559,15 +667,17 @@ export default function App() {
         setSession(nextSession)
         setStatusText(messages.statusTexts.groupCreated)
       } else {
-        if (!inviteToken.trim()) {
+        const normalizedInvite = normalizeInviteInput(inviteToken)
+        if (!normalizedInvite) {
           setErrorText(messages.errors.inviteRequired)
           return
         }
+        setInviteToken(normalizedInvite)
         const result = await joinGroup({
           deviceId,
           displayName,
           passphrase,
-          inviteToken
+          inviteToken: normalizedInvite
         })
         const nextSession: AppSession = {
           groupId: result.groupId,
@@ -796,17 +906,24 @@ export default function App() {
     session
   ])
 
-  const handleCopyInviteToken = useCallback(async () => {
-    if (!session?.inviteToken) return
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!inviteLink) return
     try {
-      await navigator.clipboard.writeText(session.inviteToken)
-      setStatusText(messages.statusTexts.tokenCopied)
+      await navigator.clipboard.writeText(inviteLink)
+      setStatusText(messages.statusTexts.inviteLinkCopied)
     } catch {
       setErrorText(messages.errors.clipboardFailed)
     }
-  }, [messages.errors.clipboardFailed, messages.statusTexts.tokenCopied, session?.inviteToken])
+  }, [inviteLink, messages.errors.clipboardFailed, messages.statusTexts.inviteLinkCopied])
 
   const activeItems = itemsByTab.get(activeTabId) ?? []
+  const hasTouchData =
+    tabs.length > 0 || storeButtons.length > 0 || (((layout ?? catalog)?.items?.length ?? 0) > 0)
+  const touchFallbackMessage = isLoading
+    ? messages.touchLoading
+    : errorText
+      ? messages.errors.loadFailed
+      : messages.touchEmpty
 
   if (!session) {
     return (
@@ -827,56 +944,119 @@ export default function App() {
         </header>
 
         <section className="card onboarding-card">
-          <div className="mode-switch">
-            <button
-              className={joinMode === 'create' ? 'active' : ''}
-              onClick={() => setJoinMode('create')}
-              type="button"
-            >
-              {messages.createMode}
-            </button>
-            <button className={joinMode === 'join' ? 'active' : ''} onClick={() => setJoinMode('join')} type="button">
-              {messages.joinMode}
-            </button>
-          </div>
+          {showInviteOnlyJoin ? (
+            <>
+              <h2>{messages.inviteEntryTitle}</h2>
+              <p className="sub-text">{messages.inviteEntryLead}</p>
 
-          <label>
-            {messages.displayName}
-            <input
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder={messages.defaultDisplayName}
-              maxLength={40}
-            />
-          </label>
+              <label>
+                {messages.displayName}
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder={messages.defaultDisplayName}
+                  maxLength={40}
+                />
+              </label>
 
-          <label>
-            {messages.passphrase}
-            <input
-              type="password"
-              value={passphrase}
-              onChange={(event) => setPassphrase(event.target.value)}
-              placeholder={messages.passphrasePlaceholder}
-              maxLength={64}
-            />
-          </label>
+              <label>
+                {messages.passphrase}
+                <input
+                  type="password"
+                  value={passphrase}
+                  onChange={(event) => setPassphrase(event.target.value)}
+                  placeholder={messages.passphrasePlaceholder}
+                  maxLength={64}
+                />
+                <small className="field-hint">{messages.passphraseHint}</small>
+              </label>
 
-          {joinMode === 'join' && (
-            <label>
-              {messages.inviteToken}
-              <input
-                value={inviteToken}
-                onChange={(event) => setInviteToken(event.target.value)}
-                placeholder={messages.inviteTokenPlaceholder}
-                maxLength={120}
-              />
-            </label>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  void handleCreateOrJoin('join')
+                }}
+                type="button"
+                disabled={isLoading}
+              >
+                {messages.joinAction}
+              </button>
+              <button
+                type="button"
+                className="inline-text-button"
+                onClick={() => {
+                  setShowManualJoinInput(true)
+                  setJoinMode('join')
+                }}
+              >
+                {messages.switchToManualJoin}
+              </button>
+              {errorText && <p className="error-text">{errorText}</p>}
+            </>
+          ) : (
+            <>
+              <div className="mode-switch">
+                <button
+                  className={joinMode === 'create' ? 'active' : ''}
+                  onClick={() => setJoinMode('create')}
+                  type="button"
+                >
+                  {messages.createMode}
+                </button>
+                <button
+                  className={joinMode === 'join' ? 'active' : ''}
+                  onClick={() => setJoinMode('join')}
+                  type="button"
+                >
+                  {messages.joinMode}
+                </button>
+              </div>
+
+              <label>
+                {messages.displayName}
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder={messages.defaultDisplayName}
+                  maxLength={40}
+                />
+              </label>
+
+              <label>
+                {messages.passphrase}
+                <input
+                  type="password"
+                  value={passphrase}
+                  onChange={(event) => setPassphrase(event.target.value)}
+                  placeholder={messages.passphrasePlaceholder}
+                  maxLength={64}
+                />
+                <small className="field-hint">{messages.passphraseHint}</small>
+              </label>
+
+              {joinMode === 'join' && (
+                <label>
+                  {messages.inviteToken}
+                  <input
+                    value={inviteToken}
+                    onChange={(event) => setInviteToken(event.target.value)}
+                    placeholder={messages.inviteTokenPlaceholder}
+                    maxLength={1024}
+                  />
+                </label>
+              )}
+
+              <button 
+                className="primary-button" 
+                onClick={() => void handleCreateOrJoin()}
+                type="button" 
+                disabled={isLoading}
+              >
+                {joinMode === 'create' ? messages.createAction : messages.joinAction}
+              </button>
+              {errorText && <p className="error-text">{errorText}</p>}
+            </>
           )}
-
-          <button className="primary-button" onClick={handleCreateOrJoin} type="button" disabled={isLoading}>
-            {joinMode === 'create' ? messages.createAction : messages.joinAction}
-          </button>
-          {errorText && <p className="error-text">{errorText}</p>}
         </section>
 
         <section className="card preview-card">
@@ -919,7 +1099,12 @@ export default function App() {
               setLayout(null)
               setInbox([])
               setCart({})
-          }}
+              setPassphrase('')
+              setInviteToken('')
+              setJoinMode('create')
+              setInviteFromLink(false)
+              setShowManualJoinInput(false)
+            }}
           >
             {messages.leaveGroup}
           </button>
@@ -930,13 +1115,26 @@ export default function App() {
         <aside className="quota-banner">{messages.quotaPaused(formatTime(quotaResumeAt, messages.locale))}</aside>
       )}
 
-      {session.inviteToken && (
+      <aside className="retention-banner" aria-live="polite">
+        <strong>{messages.retentionBannerTitle}</strong>
+        <p>{messages.retentionBannerSummary}</p>
+        <details>
+          <summary>{messages.retentionBannerDetailsTitle}</summary>
+          <ul>
+            {messages.retentionBannerDetailsPoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </details>
+      </aside>
+
+      {inviteLink && (
         <section className="card invite-card">
           <p>
-            {messages.inviteTokenLabel}: <code>{session.inviteToken}</code>
+            {messages.inviteLinkLabel}: <code>{inviteLink}</code>
           </p>
-          <button type="button" onClick={handleCopyInviteToken}>
-            {messages.copyToken}
+          <button type="button" onClick={handleCopyInviteLink}>
+            {inviteCopyLabel}
           </button>
         </section>
       )}
@@ -944,43 +1142,59 @@ export default function App() {
       <div className="main-grid">
         <div className="main-left">
           <section className="card touch-card">
-            <div className="tab-strip">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={activeTabId === tab.id ? 'active' : ''}
-                  onClick={() => {
-                    setActiveTabId(tab.id)
-                    setCustomItemTabId(tab.id)
-                  }}
-                >
-                  {tab.name}
+            {!hasTouchData ? (
+              <div className="touch-fallback">
+                <p>{touchFallbackMessage}</p>
+                <button type="button" onClick={() => void loadPrivateData()} disabled={isLoading}>
+                  {messages.refresh}
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <>
+                <div className="tab-strip">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={activeTabId === tab.id ? 'active' : ''}
+                      onClick={() => {
+                        setActiveTabId(tab.id)
+                        setCustomItemTabId(tab.id)
+                      }}
+                    >
+                      {tab.name}
+                    </button>
+                  ))}
+                </div>
 
-            <div className="item-grid">
-              {activeItems.map((item) => (
-                <button key={item.id} type="button" className="item-button" onClick={() => handleAddToCart(item.id)}>
-                  <span>{item.name}</span>
-                  <small>+1</small>
-                </button>
-              ))}
-            </div>
+                <div className="item-grid">
+                  {activeItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="item-button"
+                      onClick={() => handleAddToCart(item.id)}
+                    >
+                      <span>{item.name}</span>
+                      <small>+1</small>
+                    </button>
+                  ))}
+                </div>
 
-            <div className="store-row">
-              {storeButtons.map((store) => (
-                <button
-                  key={store.id}
-                  type="button"
-                  className={selectedStoreId === store.id ? 'selected' : ''}
-                  onClick={() => setSelectedStoreId((current) => (current === store.id ? undefined : store.id))}
-                >
-                  {store.name}
-                </button>
-              ))}
-            </div>
+                <div className="store-row">
+                  {storeButtons.map((store) => (
+                    <button
+                      key={store.id}
+                      type="button"
+                      className={selectedStoreId === store.id ? 'selected' : ''}
+                      onClick={() => setSelectedStoreId((current) => (current === store.id ? undefined : store.id))}
+                    >
+                      {store.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </section>
 
           {session.role === 'admin' && (

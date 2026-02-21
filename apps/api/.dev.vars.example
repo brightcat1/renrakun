@@ -6,7 +6,12 @@ VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=mailto:your-email@example.com
 # Completed requests older than this (days) are purged by daily cron. Set 0 to disable.
-COMPLETED_RETENTION_DAYS=30
+COMPLETED_RETENTION_DAYS=14
 # Daily maintenance guardrails (free-tier protection).
 MAINTENANCE_MAX_DELETE_PER_RUN=2000
 MAINTENANCE_MAX_BATCHES_PER_RUN=20
+# Unused group cleanup policy (conservative + two-phase deletion).
+UNUSED_GROUP_CANDIDATE_DAYS=60
+UNUSED_GROUP_DELETE_GRACE_DAYS=30
+MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN=200
+MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN=10

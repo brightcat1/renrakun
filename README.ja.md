@@ -7,7 +7,7 @@
 
 - タッチパネル型 UI で消耗品をカートに追加して依頼送信
 - グループ内メンバーへ Push 通知 + 受信箱イベント配信
-- 依頼ステータス管理（`requested` / `acknowledged` / `completed`）
+- 依頼ステータス管理（`依頼中` / `対応中` / `購入完了`）
 - 管理者のみ、グループ専用タブ・アイテムを追加可能
 - 無料枠超過時は書き込み停止し、翌日 0:00 JST に自動復帰
 
@@ -93,6 +93,7 @@ pnpm wrangler d1 migrations apply renrakun --local
 ```
 
 `--local` は Cloudflare の本番D1ではなく、ローカルの `.wrangler/state` 配下にある D1 へ適用されます。
+- 画面で「データを読み込めませんでした」と出た場合は、DBリセット前に `migrations apply` の適用状況と API ログを確認してください。
 
 4. 開発サーバーの起動:
 
@@ -124,8 +125,10 @@ npx wrangler secret put VAPID_SUBJECT
 
 - `VAPID_SUBJECT` を Secret 登録していれば、`wrangler.toml` にメールアドレスを書く必要はありません。
 - `VAPID_*` が未設定でも依頼送信は動作しますが、Web Push は送信されません。
-- 完了済み依頼の保持期間は `COMPLETED_RETENTION_DAYS`（既定 `30` 日）で調整できます。`0` 以下で自動削除を無効化できます。
+- 完了済み依頼の保持期間は `COMPLETED_RETENTION_DAYS`（既定 `14` 日）で調整できます。`0` 以下で自動削除を無効化できます。
 - 日次メンテ処理には無料枠保護の上限もあり、`MAINTENANCE_MAX_DELETE_PER_RUN`（既定 `2000`）と `MAINTENANCE_MAX_BATCHES_PER_RUN`（既定 `20`）で1回実行あたりの処理量を制限します（※削除対象の判定は COMPLETED_RETENTION_DAYS の設定に従います）。
+- 未使用グループは中間条件（作成60日超・未完了依頼0件・メンバー1人・Push登録0件・カスタム0件）で削除予定化され、30日猶予後に自動削除されます。`UNUSED_GROUP_CANDIDATE_DAYS` / `UNUSED_GROUP_DELETE_GRACE_DAYS` / `MAINTENANCE_MAX_UNUSED_GROUPS_PER_RUN` / `MAINTENANCE_MAX_UNUSED_GROUP_BATCHES_PER_RUN` で調整できます。
+- アプリ画面上にもデータ保持ポリシーを常設表示しています（READMEを見なくても確認可能）。
 
 ## PWAとして使う（利用者向け）
 
@@ -143,7 +146,7 @@ npx wrangler secret put VAPID_SUBJECT
 ## 使い方（開発版）
 
 1. Web画面からグループを作成（表示名・合言葉）
-2. 招待トークンを相手に共有し、相手が合言葉で参加
+2. 招待リンクを相手に共有し、相手が表示名・合言葉で参加（必要ならトークン手動入力も可能）
 3. タブからアイテムをタップしてカートに追加し、送信
 4. 受信側で `対応する` / `購入完了` にステータスを更新
 
@@ -158,5 +161,5 @@ npx wrangler secret put VAPID_SUBJECT
 
 - **Push通知**: iOS環境ではOSバージョンやホーム画面への追加状況、通知許可設定により、通知が利用できない場合があります。
 - **書き込み制限**: Cloudflareの無料枠内で運用するため、書き込み系APIは日次上限に達すると制限がかかります（翌日 0:00 JST に自動復帰）。
-- **履歴の自動整理**: 完了済み（`completed`）依頼は既定で30日後に自動削除されます（`COMPLETED_RETENTION_DAYS` で変更可）。
+- **履歴の自動整理**: `購入完了` にした依頼は既定で14日後に自動削除されます（`COMPLETED_RETENTION_DAYS` で変更可）。`依頼中` / `対応中` は自動削除されません。
 - **スコープ**: 本MVP版には、価格比較・在庫管理・外部EC連携などの機能は含まれていません。
