@@ -147,6 +147,25 @@ export function deleteCustomItem(groupId: string, itemId: string, auth: SessionA
   })
 }
 
+export function createCustomStore(
+  groupId: string,
+  auth: SessionAuth,
+  input: { name: string }
+): Promise<StoreButton> {
+  return apiFetch<StoreButton>(`/api/groups/${groupId}/custom-stores`, {
+    method: 'POST',
+    auth,
+    body: input
+  })
+}
+
+export function deleteCustomStore(groupId: string, storeId: string, auth: SessionAuth): Promise<{ ok: boolean }> {
+  return apiFetch(`/api/groups/${groupId}/custom-stores/${storeId}/delete`, {
+    method: 'POST',
+    auth
+  })
+}
+
 export function sendRequest(auth: SessionAuth, input: RequestCreateInput): Promise<{
   requestId: string
   pushMessage: string

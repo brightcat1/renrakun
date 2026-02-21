@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { RequestStatus } from '@renrakun/shared'
+import type { RequestIntent, RequestStatus } from '@renrakun/shared'
 import {
   API_BASE_URL,
   ApiClientError,
   ackRequest,
   completeRequest,
   createCustomItem,
+  createCustomStore,
   createCustomTab,
   deleteCustomItem,
+  deleteCustomStore,
   deleteCustomTab,
   createGroup,
   fetchCatalog,
@@ -21,13 +23,14 @@ import {
   type CatalogItem,
   type CatalogTab,
   type InboxEvent,
-  type LayoutResponse
+  type LayoutResponse,
+  type StoreButton
 } from './api'
 import { clearSession, getOrCreateDeviceId, readSession, writeSession, type AppSession } from './session'
 
 type JoinMode = 'create' | 'join'
 type Language = 'ja' | 'en'
-type DeleteTargetKind = 'tab' | 'item'
+type DeleteTargetKind = 'tab' | 'item' | 'store'
 type InboxFilter = 'open' | 'all'
 type SwPushContextMessage =
   | {
@@ -102,8 +105,12 @@ interface Messages {
   selfLabel: string
   requestOwnSuffix: string
   requestOtherSuffix: string
+  requestOwnVisitSuffix?: string
+  requestOtherVisitSuffix?: string
   ack: string
   complete: string
+  intentBuy?: string
+  intentVisit?: string
   adminTitle: string
   adminLead: string
   newTab: string
@@ -115,8 +122,13 @@ interface Messages {
   addItem: string
   customTabsSection: string
   customItemsSection: string
+  customStoresSection?: string
   noCustomTabs: string
   noCustomItems: string
+  noCustomStores?: string
+  newStore?: string
+  newStorePlaceholder?: string
+  addStore?: string
   deleteAction: string
   deleteCancel: string
   deleteConfirm: string
@@ -125,6 +137,10 @@ interface Messages {
   deleteModalBodyItem: (name: string) => string
   cartTitle: string
   cartEmpty: string
+  cartStoreLabel?: string
+  cartClearStore?: string
+  addToCartLabel?: string
+  removeFromCartLabel?: string
   sendRequest: string
   languageSwitch: string
   defaultStatus: string
@@ -143,10 +159,12 @@ interface Messages {
     pushFailed: string
     cartEmpty: string
     sendFailed: string
+    visitStoreRequired?: string
     ackFailed: string
     completeFailed: string
     addTabFailed: string
     addItemFailed: string
+    addStoreFailed?: string
     clipboardFailed: string
     deleteTabFailed: string
     deleteItemFailed: string
@@ -161,6 +179,8 @@ interface Messages {
     itemAdded: (name: string) => string
     tabDeleted: (name: string) => string
     itemDeleted: (name: string) => string
+    storeAdded?: (name: string) => string
+    storeDeleted?: (name: string) => string
     inviteLinkCopied: string
   }
 }
@@ -175,14 +195,14 @@ const MESSAGES: Record<Language, Messages> = {
     locale: 'ja-JP',
     appTitle: 'れんらくん',
     heroKicker: 'Tap. Notify. Done.',
-    onboardingLead: '家の消耗品連絡を、チャットではなく専用タッチパネルで。',
+    onboardingLead: '家庭内の買い物依頼を、専用タッチパネルでサッと共有できます。',
     createMode: 'グループ作成',
     joinMode: 'グループ参加',
     displayName: '表示名',
     defaultDisplayName: 'ゲスト',
     passphrase: '合言葉',
     passphrasePlaceholder: '例: secret123',
-    passphraseHint: '半角英数字（6文字以上）',
+    passphraseHint: '6文字以上（日本語・英数字どちらでも可）',
     inviteToken: '招待リンクまたはトークン',
     inviteTokenPlaceholder: '例: https://.../?invite=... またはトークン',
     inviteEntryTitle: '招待リンクから参加',
@@ -191,22 +211,30 @@ const MESSAGES: Record<Language, Messages> = {
     createAction: 'グループを作る',
     joinAction: 'グループに参加する',
     fixedCatalog: '固定カタログ',
-    fixedCatalogLead: '通常操作は入力不要。タップだけで依頼できます。',
-    dashboardTitle: '家の消耗品ダッシュボード',
+    fixedCatalogLead: '通常操作はタップだけで使えます。',
+    dashboardTitle: '家庭内 依頼ダッシュボード',
     hello: (name) => `こんにちは、${name}さん`,
     enableNotifications: '通知を有効化',
+    resyncNotifications: '通知を再同期',
     leaveGroup: 'グループ退出',
-    quotaPaused: (resumeAt) => `無料枠上限のため書き込み機能を一時停止中です。再開予定: ${resumeAt}（JST基準）`,
+    quotaPaused: (resumeAt) => `無料枠上限のため書き込みを一時停止中です。再開予定: ${resumeAt}（JST）`,
     retentionBannerTitle: '履歴の保存期間',
     retentionBannerSummary: '未対応の依頼は残ります。完了した依頼は14日後に自動で削除されます。',
     retentionBannerDetailsTitle: '詳細を見る',
     retentionBannerDetailsPoints: [
       '「依頼中」「対応中」の依頼は自動では削除されません。',
-      '「購入完了」にした依頼は、リストが長くなりすぎないよう14日後に自動で削除されます。',
+      '「完了」にした依頼は、14日後に自動で削除されます。',
       '長期間使われていないグループは段階的に整理されます。'
     ],
     inviteLinkLabel: '招待リンク',
     copyInviteLink: '招待リンクをコピー',
+    membersTitle: '参加中メンバー',
+    membersCount: (count) => `${count}人`,
+    memberCreatorBadge: '作成者',
+    memberPushReady: '通知OK',
+    memberPushNotReady: '通知未設定',
+    memberYouSuffix: '（あなた）',
+    memberResyncHint: '通知が届かない場合は「通知を再同期」を押してください。',
     touchLoading: '項目を読み込み中です。',
     touchEmpty: '表示できる項目がありません。更新して再度お試しください。',
     inboxTitle: '受信箱',
@@ -217,10 +245,14 @@ const MESSAGES: Record<Language, Messages> = {
     selfLabel: 'あなた',
     requestOwnSuffix: 'を依頼しました',
     requestOtherSuffix: 'を買ってほしいと言っています',
+    requestOwnVisitSuffix: 'に行きたいと依頼しました',
+    requestOtherVisitSuffix: 'に行きたいと言っています',
     ack: '対応する',
-    complete: '購入完了',
+    complete: '完了',
+    intentBuy: '買ってほしい',
+    intentVisit: '行きたい',
     adminTitle: 'グループ専用アイテムの追加',
-    adminLead: 'このグループを作成した人のみ、タブやアイテムを追加・管理できます。',
+    adminLead: 'このグループを作成した人のみ、タブ・アイテム・店舗を追加/管理できます。',
     newTab: '新しいタブ名',
     newTabPlaceholder: '例: 日用品',
     addTab: 'タブを追加',
@@ -230,8 +262,13 @@ const MESSAGES: Record<Language, Messages> = {
     addItem: 'アイテムを追加',
     customTabsSection: '追加したタブの削除',
     customItemsSection: '追加したアイテムの削除',
+    customStoresSection: '追加した店舗の削除',
     noCustomTabs: '削除できるタブはありません',
     noCustomItems: 'このタブに削除できるアイテムはありません',
+    noCustomStores: '削除できる店舗はありません',
+    newStore: '新しい店舗名',
+    newStorePlaceholder: '例: コストコ',
+    addStore: '店舗を追加',
     deleteAction: '削除',
     deleteCancel: '取り消し',
     deleteConfirm: '削除する',
@@ -240,42 +277,50 @@ const MESSAGES: Record<Language, Messages> = {
     deleteModalBodyItem: (name) => `アイテム「${name}」を削除します。よろしいですか？`,
     cartTitle: 'カート',
     cartEmpty: 'アイテムがありません',
+    cartStoreLabel: '店舗',
+    cartClearStore: '解除',
+    addToCartLabel: '追加',
+    removeFromCartLabel: '減らす',
     sendRequest: '依頼を送信する',
     languageSwitch: 'English',
-    defaultStatus: 'タブを選んで、必要なものをポチポチ追加してください。',
+    defaultStatus: 'タブを選んで、必要なものを追加してください。',
     statusRequested: '依頼中',
     statusAcknowledged: '対応中',
-    statusCompleted: '購入完了',
+    statusCompleted: '完了',
     requestSentFallback: '依頼を送信しました。',
     errors: {
-      quotaReached: '無料枠の上限に達しました。翌日0:00 JSTに自動再開します。',
+      quotaReached: '無料枠の上限に達しました。00:00 JST に自動復帰します。',
       profileRequired: '表示名と合言葉は必須です。',
       inviteRequired: '参加には招待リンクまたはトークンが必要です。',
-      invalidSession: 'セッションが無効になりました。グループに入り直してください。',
+      invalidSession: 'セッションが無効です。もう一度参加してください。',
       loadFailed: 'データを読み込めませんでした。更新して再度お試しください。',
       groupFailed: 'グループ操作に失敗しました',
       vapidMissing: 'VITE_VAPID_PUBLIC_KEY が未設定です。',
-      pushFailed: '通知設定に失敗しました',
+      pushFailed: '通知の設定に失敗しました',
       cartEmpty: 'カートが空です。',
-      sendFailed: '依頼送信に失敗しました',
+      sendFailed: '依頼の送信に失敗しました',
+      visitStoreRequired: '行きたい依頼には店舗の選択が必要です。',
       ackFailed: '対応中への更新に失敗しました',
-      completeFailed: '購入完了への更新に失敗しました',
-      addTabFailed: 'カスタムタブ追加に失敗しました',
-      addItemFailed: 'カスタムアイテム追加に失敗しました',
-      clipboardFailed: 'クリップボードへコピーできませんでした。',
+      completeFailed: '完了への更新に失敗しました',
+      addTabFailed: 'タブ追加に失敗しました',
+      addItemFailed: 'アイテム追加に失敗しました',
+      addStoreFailed: '店舗追加に失敗しました',
+      clipboardFailed: 'クリップボードへのコピーに失敗しました。',
       deleteTabFailed: 'タブ削除に失敗しました',
       deleteItemFailed: 'アイテム削除に失敗しました',
-      tabInUse: 'このタブは過去の依頼に含まれているため削除できません。',
-      itemInUse: 'このアイテムは過去の依頼に含まれているため削除できません。'
+      tabInUse: 'このタブは過去の依頼で使われているため削除できません。',
+      itemInUse: 'このアイテムは過去の依頼で使われているため削除できません。'
     },
     statusTexts: {
       groupCreated: 'グループを作成しました。招待リンクを共有してください。',
       groupJoined: 'グループに参加しました。',
       pushEnabled: '通知を有効化しました。',
-      tabAdded: (name) => `タブ「${name}」を追加しました。`,
-      itemAdded: (name) => `アイテム「${name}」を追加しました。`,
-      tabDeleted: (name) => `タブ「${name}」を削除しました。`,
-      itemDeleted: (name) => `アイテム「${name}」を削除しました。`,
+      tabAdded: (name) => `タブを追加しました: ${name}`,
+      itemAdded: (name) => `アイテムを追加しました: ${name}`,
+      storeAdded: (name) => `店舗を追加しました: ${name}`,
+      tabDeleted: (name) => `タブを削除しました: ${name}`,
+      itemDeleted: (name) => `アイテムを削除しました: ${name}`,
+      storeDeleted: (name) => `店舗を削除しました: ${name}`,
       inviteLinkCopied: '招待リンクをコピーしました。'
     }
   },
@@ -290,7 +335,7 @@ const MESSAGES: Record<Language, Messages> = {
     defaultDisplayName: 'Guest',
     passphrase: 'Passphrase',
     passphrasePlaceholder: 'e.g. secret123',
-    passphraseHint: '6+ characters (alphanumeric)',
+    passphraseHint: '6+ characters (Japanese or alphanumeric)',
     inviteToken: 'Invite link or token',
     inviteTokenPlaceholder: 'e.g. https://.../?invite=... or token',
     inviteEntryTitle: 'Join from invite link',
@@ -303,6 +348,7 @@ const MESSAGES: Record<Language, Messages> = {
     dashboardTitle: 'Household Restock Dashboard',
     hello: (name) => `Hello, ${name}`,
     enableNotifications: 'Enable notifications',
+    resyncNotifications: 'Resync notifications',
     leaveGroup: 'Leave group',
     quotaPaused: (resumeAt) => `Write APIs are paused by daily quota. Resume at: ${resumeAt} (JST)`,
     retentionBannerTitle: 'How history is kept',
@@ -315,6 +361,13 @@ const MESSAGES: Record<Language, Messages> = {
     ],
     inviteLinkLabel: 'Invite link',
     copyInviteLink: 'Copy invite link',
+    membersTitle: 'Members in group',
+    membersCount: (count) => `${count} members`,
+    memberCreatorBadge: 'Creator',
+    memberPushReady: 'Notifications OK',
+    memberPushNotReady: 'Notifications off',
+    memberYouSuffix: '(You)',
+    memberResyncHint: 'If notifications do not arrive, tap "Resync notifications".',
     touchLoading: 'Loading items...',
     touchEmpty: 'No items to show. Please refresh and try again.',
     inboxTitle: 'Inbox',
@@ -325,10 +378,14 @@ const MESSAGES: Record<Language, Messages> = {
     selfLabel: 'You',
     requestOwnSuffix: ' requested this.',
     requestOtherSuffix: ' needs this purchased.',
+    requestOwnVisitSuffix: ' requested a visit.',
+    requestOtherVisitSuffix: ' wants to visit.',
     ack: 'Acknowledge',
     complete: 'Complete',
+    intentBuy: 'Need to buy',
+    intentVisit: 'Want to visit',
     adminTitle: 'Add group-only items',
-    adminLead: 'Only the person who created this group can add and manage tabs and items.',
+    adminLead: 'Only the person who created this group can add and manage tabs, items, and stores.',
     newTab: 'New tab name',
     newTabPlaceholder: 'e.g. Household',
     addTab: 'Add tab',
@@ -338,8 +395,13 @@ const MESSAGES: Record<Language, Messages> = {
     addItem: 'Add item',
     customTabsSection: 'Delete added tabs',
     customItemsSection: 'Delete added items',
+    customStoresSection: 'Delete added stores',
     noCustomTabs: 'No added tabs to delete',
     noCustomItems: 'No added items in this tab',
+    noCustomStores: 'No added stores to delete',
+    newStore: 'New store name',
+    newStorePlaceholder: 'e.g. Costco',
+    addStore: 'Add store',
     deleteAction: 'Delete',
     deleteCancel: 'Cancel',
     deleteConfirm: 'Delete',
@@ -348,11 +410,15 @@ const MESSAGES: Record<Language, Messages> = {
     deleteModalBodyItem: (name) => `Delete item "${name}"?`,
     cartTitle: 'Cart',
     cartEmpty: 'No items',
+    cartStoreLabel: 'Store',
+    cartClearStore: 'Clear',
+    addToCartLabel: 'Add',
+    removeFromCartLabel: 'Decrease',
     sendRequest: 'Send request',
     languageSwitch: '日本語',
     defaultStatus: 'Select a tab and tap items to add them.',
     statusRequested: 'Requested',
-    statusAcknowledged: 'Acknowledged',
+    statusAcknowledged: 'In progress',
     statusCompleted: 'Completed',
     requestSentFallback: 'Request sent.',
     errors: {
@@ -366,10 +432,12 @@ const MESSAGES: Record<Language, Messages> = {
       pushFailed: 'Failed to enable notifications',
       cartEmpty: 'Cart is empty.',
       sendFailed: 'Failed to send request',
+      visitStoreRequired: 'Select a store for a visit request.',
       ackFailed: 'Failed to update status to acknowledged',
       completeFailed: 'Failed to update status to completed',
       addTabFailed: 'Failed to add custom tab',
       addItemFailed: 'Failed to add custom item',
+      addStoreFailed: 'Failed to add custom store',
       clipboardFailed: 'Failed to copy to clipboard.',
       deleteTabFailed: 'Failed to delete tab',
       deleteItemFailed: 'Failed to delete item',
@@ -382,8 +450,10 @@ const MESSAGES: Record<Language, Messages> = {
       pushEnabled: 'Notifications enabled.',
       tabAdded: (name) => `Added tab: ${name}`,
       itemAdded: (name) => `Added item: ${name}`,
+      storeAdded: (name) => `Added store: ${name}`,
       tabDeleted: (name) => `Deleted tab: ${name}`,
       itemDeleted: (name) => `Deleted item: ${name}`,
+      storeDeleted: (name) => `Deleted store: ${name}`,
       inviteLinkCopied: 'Invite link copied.'
     }
   }
@@ -461,6 +531,7 @@ export default function App() {
   const [inboxFilter, setInboxFilter] = useState<InboxFilter>('open')
   const [activeTabId, setActiveTabId] = useState('')
   const [selectedStoreId, setSelectedStoreId] = useState<string | undefined>(undefined)
+  const [requestIntent, setRequestIntent] = useState<RequestIntent>('buy')
   const [cart, setCart] = useState<Record<string, number>>({})
   const [joinMode, setJoinMode] = useState<JoinMode>('create')
   const [displayName, setDisplayName] = useState(() => MESSAGES[getInitialLanguage()].defaultDisplayName)
@@ -468,6 +539,7 @@ export default function App() {
   const [inviteToken, setInviteToken] = useState('')
   const [customTabName, setCustomTabName] = useState('')
   const [customItemName, setCustomItemName] = useState('')
+  const [customStoreName, setCustomStoreName] = useState('')
   const [customItemTabId, setCustomItemTabId] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [statusText, setStatusText] = useState(() => MESSAGES[getInitialLanguage()].defaultStatus)
@@ -726,6 +798,10 @@ export default function App() {
     () => tabs.filter((tab) => !tab.isSystem && (!session || tab.groupId === session.groupId)),
     [session, tabs]
   )
+  const customStores = useMemo(
+    () => storeButtons.filter((store) => !store.isSystem && (!session || store.groupId === session.groupId)),
+    [session, storeButtons]
+  )
   const customItemsInSelectedTab = useMemo(() => {
     const source = layout ?? catalog
     if (!source) return []
@@ -738,9 +814,24 @@ export default function App() {
     }
     return map
   }, [catalog, layout])
+  const storeMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const store of storeButtons) {
+      map.set(store.id, store.name)
+    }
+    return map
+  }, [storeButtons])
+
+  useEffect(() => {
+    if (!selectedStoreId) return
+    if (!storeButtons.some((store) => store.id === selectedStoreId)) {
+      setSelectedStoreId(undefined)
+    }
+  }, [selectedStoreId, storeButtons])
 
   const cartEntries = useMemo(() => Object.entries(cart).filter(([, qty]) => qty > 0), [cart])
   const cartCount = useMemo(() => cartEntries.reduce((sum, [, qty]) => sum + qty, 0), [cartEntries])
+  const selectedStoreName = selectedStoreId ? storeMap.get(selectedStoreId) : undefined
   const visibleInbox = useMemo(
     () => (inboxFilter === 'all' ? inbox : inbox.filter((event) => event.status !== 'completed')),
     [inbox, inboxFilter]
@@ -771,7 +862,23 @@ export default function App() {
     (language === 'ja'
       ? '通知が届かない場合は「通知を再同期」を押してください。'
       : 'If notifications do not arrive, tap "Resync notifications".')
-
+  const intentBuyLabel = messages.intentBuy || (language === 'ja' ? '買ってほしい' : 'Need to buy')
+  const intentVisitLabel = messages.intentVisit || (language === 'ja' ? '行きたい' : 'Want to visit')
+  const customStoresSection =
+    messages.customStoresSection || (language === 'ja' ? '追加した店舗の削除' : 'Delete added stores')
+  const noCustomStores =
+    messages.noCustomStores || (language === 'ja' ? '削除できる店舗はありません' : 'No added stores to delete')
+  const newStoreLabel = messages.newStore || (language === 'ja' ? '新しい店舗名' : 'New store name')
+  const newStorePlaceholder =
+    messages.newStorePlaceholder || (language === 'ja' ? '例: コストコ' : 'e.g. Costco')
+  const addStoreLabel = messages.addStore || (language === 'ja' ? '店舗を追加' : 'Add store')
+  const cartStoreLabel = messages.cartStoreLabel || (language === 'ja' ? '店舗' : 'Store')
+  const cartClearStoreLabel = messages.cartClearStore || (language === 'ja' ? '解除' : 'Clear')
+  const addToCartLabel = messages.addToCartLabel || (language === 'ja' ? '追加' : 'Add')
+  const removeFromCartLabel = messages.removeFromCartLabel || (language === 'ja' ? '減らす' : 'Decrease')
+  const itemButtonsDisabled = requestIntent === 'visit'
+  const visitModeItemDisabledHint =
+    language === 'ja' ? '「行きたい」ではアイテムを追加できません。店舗を選択してください。' : 'Item add is disabled in "Want to visit". Select a store.'
   const applyError = useCallback((error: unknown, fallback: string) => {
     if (isQuotaError(error)) {
       setQuotaResumeAt(error.resumeAt ?? null)
@@ -957,6 +1064,14 @@ export default function App() {
     }))
   }, [])
 
+  const handleToggleStore = useCallback((storeId: string) => {
+    setSelectedStoreId((current) => (current === storeId ? undefined : storeId))
+  }, [])
+
+  const handleClearStoreFromCart = useCallback(() => {
+    setSelectedStoreId(undefined)
+  }, [])
+
   const handleDecreaseFromCart = useCallback((itemId: string) => {
     setCart((current) => {
       const next = { ...current }
@@ -972,8 +1087,12 @@ export default function App() {
 
   const handleSendRequest = useCallback(async () => {
     if (!session || !auth) return
-    if (cartEntries.length === 0) {
+    if (requestIntent === 'buy' && cartEntries.length === 0) {
       setErrorText(messages.errors.cartEmpty)
+      return
+    }
+    if (requestIntent === 'visit' && !selectedStoreId) {
+      setErrorText(messages.errors.visitStoreRequired ?? (language === 'ja' ? '行きたい依頼には店舗の選択が必要です。' : 'Select a store for a visit request.'))
       return
     }
 
@@ -985,11 +1104,13 @@ export default function App() {
         groupId: session.groupId,
         senderMemberId: session.memberId,
         storeId: selectedStoreId,
-        itemIds
+        itemIds,
+        intent: requestIntent
       })
       setStatusText(language === 'ja' ? result.pushMessage : messages.requestSentFallback)
       setCart({})
       setSelectedStoreId(undefined)
+      setRequestIntent('buy')
       await loadPrivateData()
     } catch (error) {
       applyError(error, messages.errors.sendFailed)
@@ -1005,6 +1126,7 @@ export default function App() {
     messages.errors.cartEmpty,
     messages.errors.sendFailed,
     messages.requestSentFallback,
+    requestIntent,
     selectedStoreId,
     session
   ])
@@ -1073,7 +1195,36 @@ export default function App() {
     session
   ])
 
-  const openDeleteModal = useCallback((kind: DeleteTargetKind, target: CatalogTab | CatalogItem) => {
+  const handleCreateCustomStore = useCallback(async () => {
+    if (!session || !auth || !customStoreName.trim()) return
+    try {
+      const created = await createCustomStore(session.groupId, auth, { name: customStoreName.trim() })
+      setCustomStoreName('')
+      setStatusText(
+        messages.statusTexts.storeAdded
+          ? messages.statusTexts.storeAdded(created.name)
+          : language === 'ja'
+            ? `店舗「${created.name}」を追加しました。`
+            : `Added store: ${created.name}`
+      )
+      await loadPrivateData()
+      setSelectedStoreId(created.id)
+    } catch (error) {
+      applyError(error, messages.errors.addStoreFailed ?? messages.errors.addItemFailed)
+    }
+  }, [
+    applyError,
+    auth,
+    customStoreName,
+    language,
+    loadPrivateData,
+    messages.errors.addItemFailed,
+    messages.errors.addStoreFailed,
+    messages.statusTexts,
+    session
+  ])
+
+  const openDeleteModal = useCallback((kind: DeleteTargetKind, target: CatalogTab | CatalogItem | StoreButton) => {
     setDeleteTarget({ kind, id: target.id, name: target.name })
   }, [])
 
@@ -1084,9 +1235,18 @@ export default function App() {
       if (deleteTarget.kind === 'tab') {
         await deleteCustomTab(session.groupId, deleteTarget.id, auth)
         setStatusText(messages.statusTexts.tabDeleted(deleteTarget.name))
-      } else {
+      } else if (deleteTarget.kind === 'item') {
         await deleteCustomItem(session.groupId, deleteTarget.id, auth)
         setStatusText(messages.statusTexts.itemDeleted(deleteTarget.name))
+      } else {
+        await deleteCustomStore(session.groupId, deleteTarget.id, auth)
+        setStatusText(
+          messages.statusTexts.storeDeleted
+            ? messages.statusTexts.storeDeleted(deleteTarget.name)
+            : language === 'ja'
+              ? `店舗「${deleteTarget.name}」を削除しました。`
+              : `Deleted store: ${deleteTarget.name}`
+        )
       }
       setDeleteTarget(null)
       await loadPrivateData()
@@ -1101,13 +1261,18 @@ export default function App() {
       }
       applyError(
         error,
-        deleteTarget.kind === 'tab' ? messages.errors.deleteTabFailed : messages.errors.deleteItemFailed
+        deleteTarget.kind === 'tab'
+          ? messages.errors.deleteTabFailed
+          : deleteTarget.kind === 'item'
+            ? messages.errors.deleteItemFailed
+            : messages.errors.deleteItemFailed
       )
     }
   }, [
     applyError,
     auth,
     deleteTarget,
+    language,
     loadPrivateData,
     messages.errors.deleteItemFailed,
     messages.errors.deleteTabFailed,
@@ -1310,6 +1475,7 @@ export default function App() {
               setLayout(null)
               setInbox([])
               setCart({})
+              setRequestIntent('buy')
               setPassphrase('')
               setInviteToken('')
               setJoinMode('create')
@@ -1414,14 +1580,19 @@ export default function App() {
                     <button
                       key={item.id}
                       type="button"
-                      className="item-button"
+                      className={`item-button${itemButtonsDisabled ? ' disabled' : ''}`}
+                      disabled={itemButtonsDisabled}
                       onClick={() => handleAddToCart(item.id)}
                     >
-                      <span>{item.name}</span>
-                      <small>+1</small>
+                      <span className="item-name">{item.name}</span>
+                      <span className="item-add">
+                        <span aria-hidden="true">＋</span>
+                        {addToCartLabel}
+                      </span>
                     </button>
                   ))}
                 </div>
+                {itemButtonsDisabled && <p className="sub-text mode-hint">{visitModeItemDisabledHint}</p>}
 
                 <div className="store-row">
                   {storeButtons.map((store) => (
@@ -1429,7 +1600,7 @@ export default function App() {
                       key={store.id}
                       type="button"
                       className={selectedStoreId === store.id ? 'selected' : ''}
-                      onClick={() => setSelectedStoreId((current) => (current === store.id ? undefined : store.id))}
+                      onClick={() => handleToggleStore(store.id)}
                     >
                       {store.name}
                     </button>
@@ -1487,6 +1658,25 @@ export default function App() {
                 </button>
               </div>
               <div className="admin-form">
+                <label>
+                  {newStoreLabel}
+                  <input
+                    value={customStoreName}
+                    onChange={(event) => setCustomStoreName(event.target.value)}
+                    placeholder={newStorePlaceholder}
+                    maxLength={30}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="admin-action-button"
+                  onClick={() => void handleCreateCustomStore()}
+                  disabled={!customStoreName.trim()}
+                >
+                  {addStoreLabel}
+                </button>
+              </div>
+              <div className="admin-form">
                 <h3>{messages.customTabsSection}</h3>
                 {customTabs.length === 0 ? (
                   <p className="empty">{messages.noCustomTabs}</p>
@@ -1528,6 +1718,27 @@ export default function App() {
                   </ul>
                 )}
               </div>
+              <div className="admin-form">
+                <h3>{customStoresSection}</h3>
+                {customStores.length === 0 ? (
+                  <p className="empty">{noCustomStores}</p>
+                ) : (
+                  <ul className="admin-list">
+                    {customStores.map((store) => (
+                      <li key={store.id}>
+                        <span>{store.name}</span>
+                        <button
+                          type="button"
+                          className="danger-button"
+                          onClick={() => openDeleteModal('store', store)}
+                        >
+                          {messages.deleteAction}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </section>
           )}
         </div>
@@ -1560,18 +1771,36 @@ export default function App() {
             </div>
             <ul className="inbox-list">
               {visibleInbox.length === 0 && <li className="empty">{messages.inboxEmpty}</li>}
-              {visibleInbox.map((event) => {
+                            {visibleInbox.map((event) => {
                 const isOwnRequest = event.senderMemberId === session.memberId
                 const actorLabel = isOwnRequest ? messages.selfLabel : event.senderName
                 const prefix = language === 'ja' ? `${actorLabel}が` : `${actorLabel} `
-                const storePrefix = event.storeName
-                  ? language === 'ja'
-                    ? `${event.storeName}で`
-                    : `at ${event.storeName} `
-                  : ''
+                const isVisitIntent = event.intent === 'visit'
+                const storePrefix =
+                  !isVisitIntent && event.storeName
+                    ? language === 'ja'
+                      ? `${event.storeName}で`
+                      : `at ${event.storeName} `
+                    : ''
                 const itemText = event.items
                   .map((item) => (item.qty > 1 ? `${item.name} x${item.qty}` : item.name))
-                  .join(language === 'ja' ? '、' : ', ')
+                  .join(language === 'ja' ? '・' : ', ')
+                const requestSuffix = isVisitIntent
+                  ? isOwnRequest
+                    ? (messages.requestOwnVisitSuffix ?? (language === 'ja' ? 'に行きたいと依頼しました' : ' requested a visit.'))
+                    : (messages.requestOtherVisitSuffix ?? (language === 'ja' ? 'に行きたいと言っています' : ' wants to visit.'))
+                  : isOwnRequest
+                    ? messages.requestOwnSuffix
+                    : messages.requestOtherSuffix
+                const requestSubject = isVisitIntent
+                  ? (event.storeName ?? (language === 'ja' ? '店舗' : 'a place'))
+                  : (itemText || (language === 'ja' ? '項目' : 'items'))
+                const visitExtra =
+                  isVisitIntent && itemText
+                    ? language === 'ja'
+                      ? `（${itemText}）`
+                      : ` (${itemText})`
+                    : ''
                 return (
                   <li key={event.eventId} className="inbox-item">
                     <div className="inbox-top">
@@ -1581,8 +1810,9 @@ export default function App() {
                     <p className="inbox-message">
                       {prefix}
                       {storePrefix}
-                      {itemText}
-                      {isOwnRequest ? messages.requestOwnSuffix : messages.requestOtherSuffix}
+                      {requestSubject}
+                      {visitExtra}
+                      {requestSuffix}
                     </p>
                     <div className="inbox-meta">{formatTime(event.createdAt, messages.locale)}</div>
                     <div className="inbox-actions">
@@ -1610,21 +1840,61 @@ export default function App() {
       </div>
 
       <footer className="cart-bar">
+        <div className="intent-switch" role="group" aria-label="request-intent">
+          <button
+            type="button"
+            className={requestIntent === 'buy' ? 'active' : ''}
+            onClick={() => setRequestIntent('buy')}
+          >
+            {intentBuyLabel}
+          </button>
+          <button
+            type="button"
+            className={requestIntent === 'visit' ? 'active' : ''}
+            onClick={() => setRequestIntent('visit')}
+          >
+            {intentVisitLabel}
+          </button>
+        </div>
         <div className="cart-header">
           <h3>
             {messages.cartTitle} ({cartCount})
           </h3>
           <p>{statusText}</p>
         </div>
-        <div className="cart-items">
-          {cartEntries.length === 0 && <span className="empty">{messages.cartEmpty}</span>}
-          {cartEntries.map(([itemId, qty]) => (
-            <button key={itemId} type="button" className="cart-pill" onClick={() => handleDecreaseFromCart(itemId)}>
-              {itemMap.get(itemId) ?? itemId} x{qty}
+        {selectedStoreName && (
+          <div className="cart-store-row">
+            <button type="button" className="cart-store-pill" onClick={handleClearStoreFromCart}>
+              <span>
+                {cartStoreLabel}: {selectedStoreName}
+              </span>
+              <span className="cart-store-clear">{cartClearStoreLabel}</span>
             </button>
+          </div>
+        )}
+        <div className="cart-items">
+          {cartEntries.length === 0 && requestIntent === 'buy' && <span className="empty">{messages.cartEmpty}</span>}
+          {cartEntries.map(([itemId, qty]) => (
+            <div key={itemId} className="cart-pill">
+              <span className="cart-pill-label">
+                {itemMap.get(itemId) ?? itemId} x{qty}
+              </span>
+              <button
+                type="button"
+                className="cart-pill-minus"
+                aria-label={removeFromCartLabel}
+                onClick={() => handleDecreaseFromCart(itemId)}
+              >
+                −
+              </button>
+            </div>
           ))}
         </div>
-        <button className="primary-button" onClick={() => void handleSendRequest()} disabled={cartEntries.length === 0 || isLoading}>
+        <button
+          className="primary-button"
+          onClick={() => void handleSendRequest()}
+          disabled={(requestIntent === 'buy' ? cartEntries.length === 0 : !selectedStoreId) || isLoading}
+        >
           {messages.sendRequest}
         </button>
       </footer>
@@ -1636,7 +1906,11 @@ export default function App() {
             <p>
               {deleteTarget.kind === 'tab'
                 ? messages.deleteModalBodyTab(deleteTarget.name)
-                : messages.deleteModalBodyItem(deleteTarget.name)}
+                : deleteTarget.kind === 'item'
+                  ? messages.deleteModalBodyItem(deleteTarget.name)
+                  : language === 'ja'
+                    ? `店舗「${deleteTarget.name}」を削除します。よろしいですか？`
+                    : `Delete store "${deleteTarget.name}"?`}
             </p>
             <div className="modal-actions">
               <button type="button" onClick={() => setDeleteTarget(null)}>

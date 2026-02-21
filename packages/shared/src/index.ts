@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export type Role = 'admin' | 'member'
 export type RequestStatus = 'requested' | 'acknowledged' | 'completed'
+export type RequestIntent = 'buy' | 'visit'
 export type QuotaState = 'open' | 'paused'
 
 export interface CatalogTab {
@@ -33,6 +34,7 @@ export interface RequestCreateInput {
   senderMemberId: string
   storeId?: string
   itemIds: string[]
+  intent?: RequestIntent
 }
 
 export interface ApiError {
@@ -54,12 +56,31 @@ export const joinGroupSchema = z.object({
   passphrase: z.string().trim().min(6).max(64)
 })
 
-export const createRequestSchema = z.object({
-  groupId: z.string().min(1),
-  senderMemberId: z.string().min(1),
-  storeId: z.string().min(1).optional(),
-  itemIds: z.array(z.string().min(1)).min(1).max(50)
-})
+export const createRequestSchema = z
+  .object({
+    groupId: z.string().min(1),
+    senderMemberId: z.string().min(1),
+    storeId: z.string().min(1).optional(),
+    itemIds: z.array(z.string().min(1)).max(50),
+    intent: z.enum(['buy', 'visit']).optional()
+  })
+  .superRefine((value, ctx) => {
+    const intent = value.intent ?? 'buy'
+    if (intent === 'buy' && value.itemIds.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['itemIds'],
+        message: 'buy intent requires at least one item'
+      })
+    }
+    if (intent === 'visit' && !value.storeId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['storeId'],
+        message: 'visit intent requires storeId'
+      })
+    }
+  })
 
 export const createCustomTabSchema = z.object({
   name: z.string().trim().min(1).max(30)
@@ -67,6 +88,10 @@ export const createCustomTabSchema = z.object({
 
 export const createCustomItemSchema = z.object({
   tabId: z.string().min(1),
+  name: z.string().trim().min(1).max(30)
+})
+
+export const createCustomStoreSchema = z.object({
   name: z.string().trim().min(1).max(30)
 })
 
@@ -113,6 +138,7 @@ export interface InboxEvent {
   eventId: string
   requestId: string
   status: RequestStatus
+  intent: RequestIntent
   senderMemberId: string
   senderName: string
   storeName: string | null
@@ -125,6 +151,7 @@ export interface PushPendingNotification {
   id: string
   requestId: string
   kind: RequestStatus
+  intent: RequestIntent
   senderMemberId: string
   senderName: string
   storeName: string | null

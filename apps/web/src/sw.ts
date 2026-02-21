@@ -183,14 +183,18 @@ async function fetchPendingNotifications(context: PushContext): Promise<PushPend
 }
 
 function buildTitle(notification: PushPendingNotification, language: Language): string {
+  const isVisit = notification.intent === 'visit'
+
   if (language === 'ja') {
     if (notification.kind === 'acknowledged') {
       return `${notification.senderName}さんが依頼を対応中にしました`
     }
     if (notification.kind === 'completed') {
-      return `${notification.senderName}さんが依頼を購入完了にしました`
+      return `${notification.senderName}さんが依頼を完了にしました`
     }
-    return `${notification.senderName}さんから依頼が届きました`
+    return isVisit
+      ? `${notification.senderName}さんが「行きたい」依頼を送りました`
+      : `${notification.senderName}さんから依頼が届きました`
   }
 
   if (notification.kind === 'acknowledged') {
@@ -199,15 +203,22 @@ function buildTitle(notification: PushPendingNotification, language: Language): 
   if (notification.kind === 'completed') {
     return `${notification.senderName} marked your request as Completed`
   }
-  return `${notification.senderName} sent a request`
+  return isVisit
+    ? `${notification.senderName} sent a visit request`
+    : `${notification.senderName} sent a request`
 }
-
 function buildBody(notification: PushPendingNotification, language: Language): string {
   const summary = notification.itemsSummary?.trim()
   if (summary) return summary
-  return language === 'ja' ? 'アプリで依頼内容を確認してください。' : 'Open the app to check request details.'
+  if (language === 'ja') {
+    return notification.intent === 'visit'
+      ? 'アプリで行きたい依頼を確認してください。'
+      : 'アプリで依頼内容を確認してください。'
+  }
+  return notification.intent === 'visit'
+    ? 'Open the app to check visit request details.'
+    : 'Open the app to check request details.'
 }
-
 function readPayloadMessage(data: PushMessageData | null): PushPayloadMessage | null {
   if (!data) return null
   try {

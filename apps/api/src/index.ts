@@ -1,4 +1,5 @@
 import {
+  createCustomStoreSchema,
   createCustomItemSchema,
   createCustomTabSchema,
   createGroupSchema,
@@ -14,6 +15,7 @@ import {
   type LayoutResponse,
   type PushPendingNotification,
   type QuotaResponse,
+  type RequestIntent,
   type RequestStatus,
   type StoreButton
 } from '@renrakun/shared'
@@ -65,7 +67,7 @@ const LOG_RANK: Record<LogLevel, number> = {
 }
 
 const UNUSED_GROUP_CANDIDATE_SQL = `
-  g.created_at < ?
+  COALESCE(g.last_activity_at, g.created_at) < ?
   AND NOT EXISTS (
     SELECT 1
     FROM requests r
@@ -97,6 +99,7 @@ const UNUSED_GROUP_CANDIDATE_SQL = `
     SELECT 1
     FROM stores s
     WHERE s.group_id = g.id
+      AND s.archived_at IS NULL
   )
 `
 
@@ -234,6 +237,7 @@ app.get('/api/catalog', async (c) => {
     SELECT id, group_id AS groupId, name, is_system AS isSystem, sort_order AS sortOrder
     FROM stores
     WHERE group_id IS NULL
+      AND archived_at IS NULL
     ORDER BY sort_order ASC
     `
   ).all<DbStore>()
@@ -415,7 +419,8 @@ app.get('/api/groups/:groupId/layout', async (c) => {
     `
     SELECT id, group_id AS groupId, name, is_system AS isSystem, sort_order AS sortOrder
     FROM stores
-    WHERE group_id IS NULL OR group_id = ?
+    WHERE (group_id IS NULL OR group_id = ?)
+      AND archived_at IS NULL
     ORDER BY sort_order ASC
     `
   )
@@ -568,6 +573,90 @@ app.post('/api/groups/:groupId/custom-items', async (c) => {
   )
 })
 
+app.post('/api/groups/:groupId/custom-stores', async (c) => {
+  const groupId = c.req.param('groupId')
+  const member = await requireMember(c, groupId)
+  if (!member) return unauthorized(c)
+  if (member.role !== 'admin') throw new HTTPException(403, { message: 'ADMIN_ONLY' })
+
+  const quotaBlocked = await checkDailyWriteQuota(c)
+  if (quotaBlocked) return quotaBlocked
+
+  const parsed = createCustomStoreSchema.safeParse(await readJson(c.req.raw))
+  if (!parsed.success) {
+    return badRequest(c, 'INVALID_PAYLOAD', parsed.error.flatten())
+  }
+
+  const sortRow = await c.env.DB.prepare(
+    `
+    SELECT COALESCE(MAX(sort_order), 0) + 10 AS nextSort
+    FROM stores
+    WHERE group_id = ?
+      AND archived_at IS NULL
+    `
+  )
+    .bind(groupId)
+    .first<{ nextSort: number }>()
+  const nextSort = sortRow?.nextSort ?? 100
+
+  const storeId = crypto.randomUUID()
+  await c.env.DB.prepare(
+    `
+    INSERT INTO stores (id, group_id, name, is_system, sort_order, archived_at)
+    VALUES (?, ?, ?, 0, ?, NULL)
+    `
+  )
+    .bind(storeId, groupId, parsed.data.name, nextSort)
+    .run()
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
+
+  return c.json<StoreButton>(
+    {
+      id: storeId,
+      groupId,
+      name: parsed.data.name,
+      isSystem: false,
+      sortOrder: nextSort
+    },
+    201
+  )
+})
+
+app.post('/api/groups/:groupId/custom-stores/:storeId/delete', async (c) => {
+  const groupId = c.req.param('groupId')
+  const storeId = c.req.param('storeId')
+  const member = await requireMember(c, groupId)
+  if (!member) return unauthorized(c)
+  if (member.role !== 'admin') throw new HTTPException(403, { message: 'ADMIN_ONLY' })
+
+  const quotaBlocked = await checkDailyWriteQuota(c)
+  if (quotaBlocked) return quotaBlocked
+
+  const storeRow = await c.env.DB.prepare(
+    `
+    SELECT id, group_id AS groupId, is_system AS isSystem, archived_at AS archivedAt
+    FROM stores
+    WHERE id = ?
+    `
+  )
+    .bind(storeId)
+    .first<{ id: string; groupId: string | null; isSystem: number; archivedAt: string | null }>()
+
+  if (!storeRow) throw new HTTPException(404, { message: 'STORE_NOT_FOUND' })
+  if (storeRow.groupId !== groupId || storeRow.isSystem) {
+    throw new HTTPException(403, { message: 'STORE_NOT_DELETABLE' })
+  }
+
+  if (storeRow.archivedAt) {
+    await touchGroupAndMemberActivity(c.env, groupId, member.id)
+    return c.json({ ok: true })
+  }
+
+  await archiveStore(c, storeId)
+  await touchGroupAndMemberActivity(c.env, groupId, member.id)
+  return c.json({ ok: true })
+})
+
 app.post('/api/groups/:groupId/custom-tabs/:tabId/delete', async (c) => {
   const groupId = c.req.param('groupId')
   const tabId = c.req.param('tabId')
@@ -703,19 +792,21 @@ app.get('/api/push/pending', async (c) => {
   const rows = await c.env.DB.prepare(
     `
     SELECT
-      id,
-      request_id AS requestId,
-      kind,
-      sender_member_id AS senderMemberId,
-      sender_name AS senderName,
-      store_name AS storeName,
-      items_summary AS itemsSummary,
-      created_at AS createdAt
+      push_notifications.id AS id,
+      push_notifications.request_id AS requestId,
+      push_notifications.kind AS kind,
+      r.intent AS intent,
+      push_notifications.sender_member_id AS senderMemberId,
+      push_notifications.sender_name AS senderName,
+      push_notifications.store_name AS storeName,
+      push_notifications.items_summary AS itemsSummary,
+      push_notifications.created_at AS createdAt
     FROM push_notifications
-    WHERE group_id = ?
-      AND recipient_member_id = ?
-      AND delivered_at IS NULL
-    ORDER BY created_at ASC
+    JOIN requests r ON r.id = push_notifications.request_id
+    WHERE push_notifications.group_id = ?
+      AND push_notifications.recipient_member_id = ?
+      AND push_notifications.delivered_at IS NULL
+    ORDER BY push_notifications.created_at ASC
     LIMIT ?
     `
   )
@@ -726,6 +817,7 @@ app.get('/api/push/pending', async (c) => {
     id: row.id,
     requestId: row.requestId,
     kind: row.kind,
+    intent: row.intent ?? 'buy',
     senderMemberId: row.senderMemberId,
     senderName: row.senderName,
     storeName: row.storeName,
@@ -764,10 +856,17 @@ app.post('/api/requests', async (c) => {
   }
 
   const data = payload.data
+  const intent: RequestIntent = data.intent ?? 'buy'
   const member = await requireMember(c, data.groupId)
   if (!member) return unauthorized(c)
   if (member.id !== data.senderMemberId) {
     throw new HTTPException(403, { message: 'SENDER_MISMATCH' })
+  }
+  if (intent === 'buy' && data.itemIds.length === 0) {
+    throw new HTTPException(400, { message: 'ITEM_REQUIRED_FOR_BUY' })
+  }
+  if (intent === 'visit' && !data.storeId) {
+    throw new HTTPException(400, { message: 'STORE_REQUIRED_FOR_VISIT' })
   }
 
   let storeName: string | null = null
@@ -778,6 +877,7 @@ app.post('/api/requests', async (c) => {
       FROM stores
       WHERE id = ?
         AND (group_id IS NULL OR group_id = ?)
+        AND archived_at IS NULL
       `
     )
       .bind(data.storeId, data.groupId)
@@ -792,10 +892,14 @@ app.post('/api/requests', async (c) => {
   for (const itemId of data.itemIds) {
     qtyByItem.set(itemId, (qtyByItem.get(itemId) ?? 0) + 1)
   }
+
   const uniqueItemIds = [...qtyByItem.keys()]
-  const availableItems = await fetchAccessibleItems(c, data.groupId, uniqueItemIds)
-  if (availableItems.length !== uniqueItemIds.length) {
-    throw new HTTPException(400, { message: 'INVALID_ITEM_ID' })
+  let availableItems: Array<{ id: string; name: string }> = []
+  if (uniqueItemIds.length > 0) {
+    availableItems = await fetchAccessibleItems(c, data.groupId, uniqueItemIds)
+    if (availableItems.length !== uniqueItemIds.length) {
+      throw new HTTPException(400, { message: 'INVALID_ITEM_ID' })
+    }
   }
 
   const requestId = crypto.randomUUID()
@@ -817,15 +921,15 @@ app.post('/api/requests', async (c) => {
     const itemName = itemNameMap.get(itemId) ?? (language === 'ja' ? '不明な項目' : 'Unknown item')
     return qty > 1 ? `${itemName} x${qty}` : itemName
   })
-  const itemsSummary = buildItemsSummary(readableItems, storeName, language)
+  const itemsSummary = buildItemsSummary(readableItems, storeName, language, intent)
 
   const batchStatements: D1PreparedStatement[] = [
     c.env.DB.prepare(
       `
-      INSERT INTO requests (id, group_id, sender_member_id, store_id, status)
-      VALUES (?, ?, ?, ?, 'requested')
+      INSERT INTO requests (id, group_id, sender_member_id, store_id, status, intent)
+      VALUES (?, ?, ?, ?, 'requested', ?)
       `
-    ).bind(requestId, data.groupId, data.senderMemberId, data.storeId ?? null)
+    ).bind(requestId, data.groupId, data.senderMemberId, data.storeId ?? null, intent)
   ]
 
   for (const [itemId, qty] of qtyByItem) {
@@ -880,6 +984,7 @@ app.post('/api/requests', async (c) => {
       )
     )
   }
+
   batchStatements.push(
     c.env.DB.prepare(
       `
@@ -916,7 +1021,8 @@ app.post('/api/requests', async (c) => {
   logInfo(c.env, 'push.request.enqueued', {
     groupId: data.groupId,
     requestId,
-    recipientCount: pushRecipients.length
+    recipientCount: pushRecipients.length,
+    intent
   })
 
   return c.json(
@@ -943,6 +1049,7 @@ app.get('/api/requests/inbox', async (c) => {
       ie.id AS eventId,
       ie.request_id AS requestId,
       r.status AS status,
+      r.intent AS intent,
       r.sender_member_id AS senderMemberId,
       m.display_name AS senderName,
       r.store_id AS storeId,
@@ -991,6 +1098,7 @@ app.get('/api/requests/inbox', async (c) => {
     eventId: row.eventId,
     requestId: row.requestId,
     status: row.status,
+    intent: row.intent ?? 'buy',
     senderMemberId: row.senderMemberId,
     senderName: row.senderName,
     storeName: row.storeId ? localizeSystemStoreName(row.storeId, row.storeName ?? '', language) : row.storeName,
@@ -1181,7 +1289,7 @@ app.post('/api/requests/:requestId/complete', async (c) => {
 
     const pushMessage =
       language === 'ja'
-        ? `${member.displayName}さんが依頼を購入完了にしました: ${itemsSummary}`
+        ? `${member.displayName}さんが依頼を完了にしました: ${itemsSummary}`
         : `${member.displayName} marked your request as Completed: ${itemsSummary}`
 
     await fanoutPushNotifications(c, ownsInboxEvent.groupId, [ownsInboxEvent.senderMemberId], pushMessage)
@@ -1256,17 +1364,41 @@ function mapStore(row: DbStore, language: CatalogLanguage): StoreButton {
   }
 }
 
-function buildItemsSummary(items: string[], storeName: string | null, language: CatalogLanguage): string {
+function buildItemsSummary(
+  items: string[],
+  storeName: string | null,
+  language: CatalogLanguage,
+  intent: RequestIntent = 'buy'
+): string {
+  if (intent === 'visit') {
+    if (language === 'ja') {
+      if (storeName && items.length > 0) {
+        return `${storeName}に行って ${items.slice(0, 2).join('・')}`
+      }
+      if (storeName) return `${storeName}に行きたい`
+      return '行きたい依頼'
+    }
+    if (storeName && items.length > 0) {
+      return `Visit ${storeName}: ${items.slice(0, 2).join(', ')}`
+    }
+    if (storeName) return `Visit ${storeName}`
+    return 'Visit request'
+  }
+
   const head = items.slice(0, 2)
   const rest = Math.max(0, items.length - head.length)
   if (language === 'ja') {
-    const core = head.join('、')
+    const core = head.join('・')
     const withRest = rest > 0 ? `${core} ほか${rest}件` : core
-    return storeName ? `${storeName}で ${withRest}` : withRest
+    if (storeName && withRest) return `${storeName}で ${withRest}`
+    if (storeName) return `${storeName}で買い物`
+    return withRest || '買い物依頼'
   }
   const core = head.join(', ')
   const withRest = rest > 0 ? `${core} +${rest} more` : core
-  return storeName ? `at ${storeName}: ${withRest}` : withRest
+  if (storeName && withRest) return `at ${storeName}: ${withRest}`
+  if (storeName) return `at ${storeName}`
+  return withRest || 'request'
 }
 
 async function buildRequestSummary(
@@ -1276,14 +1408,14 @@ async function buildRequestSummary(
 ): Promise<{ storeName: string | null; itemsSummary: string }> {
   const requestStore = await env.DB.prepare(
     `
-    SELECT r.store_id AS storeId, s.name AS storeName
+    SELECT r.store_id AS storeId, r.intent AS intent, s.name AS storeName
     FROM requests r
     LEFT JOIN stores s ON s.id = r.store_id
     WHERE r.id = ?
     `
   )
     .bind(requestId)
-    .first<DbRequestStoreRow>()
+    .first<DbRequestStoreRow & { intent?: RequestIntent }>()
 
   const itemRows = await env.DB.prepare(
     `
@@ -1309,7 +1441,7 @@ async function buildRequestSummary(
 
   return {
     storeName: localizedStoreName,
-    itemsSummary: buildItemsSummary(readableItems, localizedStoreName, language)
+    itemsSummary: buildItemsSummary(readableItems, localizedStoreName, language, requestStore?.intent ?? 'buy')
   }
 }
 
@@ -1615,6 +1747,10 @@ async function archiveTab(c: { env: Env }, tabId: string): Promise<void> {
 
 async function archiveItem(c: { env: Env }, itemId: string): Promise<void> {
   await c.env.DB.prepare(`UPDATE items SET archived_at = ? WHERE id = ?`).bind(nowIso(), itemId).run()
+}
+
+async function archiveStore(c: { env: Env }, storeId: string): Promise<void> {
+  await c.env.DB.prepare(`UPDATE stores SET archived_at = ? WHERE id = ?`).bind(nowIso(), storeId).run()
 }
 
 async function readRequestStatus(c: { env: Env }, requestId: string): Promise<RequestStatus> {
@@ -2000,7 +2136,7 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
   }
 
   while (true) {
-    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) return
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) break
 
     const rows = await env.DB.prepare(
       `
@@ -2023,6 +2159,45 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
     batchCount += 1
 
     const ids = rows.results.map((row) => row.id)
+    if (ids.length === 0) break
+
+    const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
+    const availableIds = ids.slice(0, remainingDeleteBudget)
+    if (availableIds.length === 0) break
+
+    const placeholders = createInClause(availableIds.length)
+    await env.DB.prepare(`DELETE FROM tabs WHERE id IN (${placeholders})`)
+      .bind(...availableIds)
+      .run()
+    deletedCount += availableIds.length
+
+    if (availableIds.length < ids.length || ids.length < COMPLETED_PURGE_BATCH_SIZE) break
+  }
+
+  while (true) {
+    if (deletedCount >= maxDeletePerRun || batchCount >= maxBatchesPerRun) return
+
+    const rows = await env.DB.prepare(
+      `
+      SELECT s.id
+      FROM stores s
+      WHERE s.is_system = 0
+        AND s.archived_at IS NOT NULL
+        AND s.archived_at < ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM requests r
+          WHERE r.store_id = s.id
+        )
+      ORDER BY s.archived_at ASC
+      LIMIT ?
+      `
+    )
+      .bind(cutoffIso, COMPLETED_PURGE_BATCH_SIZE)
+      .all<{ id: string }>()
+    batchCount += 1
+
+    const ids = rows.results.map((row) => row.id)
     if (ids.length === 0) return
 
     const remainingDeleteBudget = Math.max(0, maxDeletePerRun - deletedCount)
@@ -2030,7 +2205,7 @@ async function purgeArchivedCustomCatalog(env: Env): Promise<void> {
     if (availableIds.length === 0) return
 
     const placeholders = createInClause(availableIds.length)
-    await env.DB.prepare(`DELETE FROM tabs WHERE id IN (${placeholders})`)
+    await env.DB.prepare(`DELETE FROM stores WHERE id IN (${placeholders})`)
       .bind(...availableIds)
       .run()
     deletedCount += availableIds.length
@@ -2118,7 +2293,7 @@ async function markUnusedGroups(
       FROM groups g
       WHERE g.cleanup_marked_at IS NULL
         AND ${UNUSED_GROUP_CANDIDATE_SQL}
-      ORDER BY g.created_at ASC
+      ORDER BY COALESCE(g.last_activity_at, g.created_at) ASC
       LIMIT ?
       `
     )
@@ -2278,7 +2453,3 @@ const worker = {
 
 export default worker
 export { QuotaGateDO }
-
-
-
-

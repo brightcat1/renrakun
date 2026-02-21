@@ -1,4 +1,4 @@
-import type { RequestStatus, Role } from '@renrakun/shared'
+import type { RequestIntent, RequestStatus, Role } from '@renrakun/shared'
 
 export interface Env {
   DB: D1Database
@@ -61,6 +61,7 @@ export interface DbRequestRow {
   eventId: string
   requestId: string
   status: RequestStatus
+  intent: RequestIntent
   senderMemberId: string
   senderName: string
   storeId: string | null
@@ -80,6 +81,7 @@ export interface DbPushPendingRow {
   id: string
   requestId: string
   kind: RequestStatus
+  intent: RequestIntent
   senderMemberId: string
   senderName: string
   storeName: string | null

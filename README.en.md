@@ -9,7 +9,9 @@ It keeps shopping requests out of daily chat noise with a dedicated panel + inbo
 - Group join via invite link + passphrase (no account registration)
 - Request status flow: `Requested` / `In progress` / `Completed`
 - Lock-screen push summaries (who + what)
-- Group creator can manage custom tabs/items
+- Group creator can manage custom tabs/items/stores (add + archive-delete)
+- Request template switch: `Need to buy` / `Want to visit`
+- Clear cart interactions (`+` to add, `-` to reduce, single store selection with quick clear)
 - Free-tier guardrails (daily limits, auto resume, staged cleanup)
 
 ## Architecture & Tech Stack
@@ -180,5 +182,6 @@ GROUP BY g.id;
 - **Privacy**: Lock-screen summaries can expose request text; avoid sensitive data in requests.
 - **Write Limits**: APIs are paused at daily free-tier limits and auto-resume at 00:00 JST to protect infrastructure.
 - **Retention**: Completed requests are purged after 14 days by default. "Requested" and "In progress" statuses are not auto-purged.
-- **Unused Groups**: Groups meeting specific criteria (e.g., single member, no push setup) are staged for cleanup via Cron Trigger (60-day candidate period + 30-day grace).
+- **Unused Groups**: Based on `last_activity_at`, groups meeting conservative criteria (e.g., single member, no push setup) are staged for cleanup via Cron Trigger (60-day candidate period + 30-day grace).
+- **Custom Store Cleanup**: Store deletion is archive-first. Archived custom stores with no remaining request references are physically removed in daily maintenance after retention.
 - **Scope**: Price comparison, inventory sync, and external e-commerce integrations are out of MVP scope.
