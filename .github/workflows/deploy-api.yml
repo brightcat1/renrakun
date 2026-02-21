@@ -51,6 +51,24 @@ jobs:
       - name: Typecheck API
         run: pnpm --filter @renrakun/api typecheck
 
+      - name: Apply D1 Migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          wranglerVersion: "4.67.0"
+          command: d1 migrations apply renrakun --remote
+
+      - name: Seed Default Data
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/api
+          wranglerVersion: "4.67.0"
+          command: d1 execute renrakun --remote --file=./migrations/0002_seed_system_catalog.sql
+
       - name: Deploy API
         uses: cloudflare/wrangler-action@v3
         with:
