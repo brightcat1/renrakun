@@ -133,6 +133,17 @@ If push is not arriving, check in this order:
 3. Verify migration status (`--local` / `--remote`)
 4. Check API logs via `wrangler tail`
 
+## PWA Lifecycle & Data Sync (Specifications)
+
+- The client is delivered and updated through the Service Worker update flow; reinstall is not part of the release/update model.
+- A new Service Worker activates (`skipWaiting` + `clientsClaim`). The UI bundle is picked up by a client reload that is intentionally triggered when the document transitions to background (`visibilityState: hidden`) to avoid disruptive mid-task reloads.
+- Private data refresh policy (authenticated sessions only) is a hybrid strategy:
+  - push-driven refresh via Service Worker `postMessage` (`REFRESH_DATA`),
+  - refresh on `focus` / `online` / `visibilitychange` (return to visible),
+  - visible-only polling every 45 seconds.
+- Auto-sync refresh is serialized and throttled (minimum interval: 5 seconds) and is suppressed while an explicit load is in progress.
+- A manual `Refresh` action remains available as a fallback mechanism.
+
 ## Specifications & Limitations
 
 - iOS Web Push depends on OS version, Home Screen install, and notification permission

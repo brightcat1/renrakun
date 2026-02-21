@@ -50,6 +50,14 @@ const FALLBACK_TEXT: Record<Language, { title: string; body: string }> = {
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
+self.addEventListener('install', () => {
+  void self.skipWaiting()
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 self.addEventListener('message', (event) => {
   event.waitUntil(handleContextMessage(event))
 })
@@ -105,6 +113,7 @@ async function handlePush(event: PushEvent): Promise<void> {
 
   if (!context) {
     await showFallbackNotification('ja', payloadMessage)
+    await notifyClientsRefresh('push')
     console.warn('[sw] push context missing, used fallback notification')
     return
   }
@@ -114,6 +123,7 @@ async function handlePush(event: PushEvent): Promise<void> {
 
     if (notifications.length === 0) {
       await showFallbackNotification(context.language, payloadMessage)
+      await notifyClientsRefresh('push')
       console.info('[sw] no pending notifications, used fallback notification')
       return
     }
@@ -137,11 +147,20 @@ async function handlePush(event: PushEvent): Promise<void> {
       )
     )
 
+    await notifyClientsRefresh('push')
     console.info('[sw] notifications shown', { count: notifications.length })
   } catch (error) {
     console.error('[sw] pending fetch failed', error)
     await showFallbackNotification(context.language, payloadMessage)
+    await notifyClientsRefresh('push')
   }
+}
+
+async function notifyClientsRefresh(reason: string): Promise<void> {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  clients.forEach((client) => {
+    ;(client as WindowClient).postMessage({ type: 'REFRESH_DATA', reason })
+  })
 }
 
 async function fetchPendingNotifications(context: PushContext): Promise<PushPendingNotification[]> {

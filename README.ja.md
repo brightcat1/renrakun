@@ -131,6 +131,17 @@ d1 migrations apply renrakun --remote --auto-confirm
 3. マイグレーション適用状況（`--local` / `--remote`）を確認
 4. `wrangler tail` で APIログを確認
 
+## PWAライフサイクルとデータ同期（仕様）
+
+- クライアント更新は Service Worker の更新フローで提供され、再インストールは更新モデルに含みません。
+- 新しい Service Worker は `skipWaiting` + `clientsClaim` で有効化されます。UIバンドルの反映は、作業中の強制リロードを避けるため、ドキュメントがバックグラウンドへ遷移したタイミング（`visibilityState: hidden`）で意図的にリロードして取り込みます。
+- プライベートデータ同期（ログイン中のみ）は無料枠を考慮したハイブリッド方式です。
+  - Push受信時に Service Worker から `postMessage`（`REFRESH_DATA`）で更新要求
+  - 画面復帰（`focus` / `online` / 可視化復帰）で更新
+  - 画面表示中のみ45秒間隔でポーリング更新
+- 自動同期は多重実行を抑止し、最短5秒の間引きを行い、明示的なロード中は実行しません。
+- 手動の `更新` 操作はフォールバック手段として提供します。
+
 ## 仕様・制限事項
 
 - iOSのWeb PushはOSバージョン・ホーム画面追加・通知許可設定に依存します

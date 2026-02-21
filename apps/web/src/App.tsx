@@ -41,6 +41,10 @@ type SwPushContextMessage =
       }
     }
   | { type: 'CLEAR_PUSH_CONTEXT' }
+type SwRefreshMessage = {
+  type: 'REFRESH_DATA'
+  reason?: string
+}
 
 interface DeleteTarget {
   kind: DeleteTargetKind
@@ -163,6 +167,8 @@ interface Messages {
 
 const LANGUAGE_STORAGE_KEY = 'renrakun_language'
 const LANGUAGE_USER_SET_KEY = 'renrakun_language_user_set'
+const AUTO_SYNC_POLL_INTERVAL_MS = 45_000
+const AUTO_SYNC_MIN_INTERVAL_MS = 5_000
 
 const MESSAGES: Record<Language, Messages> = {
   ja: {
@@ -475,6 +481,8 @@ export default function App() {
   )
   const [isLoading, setIsLoading] = useState(false)
   const lastSyncedMemberIdRef = useRef<string | null>(null)
+  const autoSyncInFlightRef = useRef(false)
+  const lastAutoSyncAtRef = useRef(0)
 
   const auth = useMemo(
     () => (session ? { deviceId, memberId: session.memberId } : null),
@@ -565,6 +573,27 @@ export default function App() {
     }
   }, [auth, messages.errors.invalidSession, messages.errors.loadFailed, session])
 
+  const runAutoSyncRefresh = useCallback(
+    async (reason: string) => {
+      if (!session || !auth) return
+      if (autoSyncInFlightRef.current) return
+      if (isLoading) return
+
+      const now = Date.now()
+      if (now - lastAutoSyncAtRef.current < AUTO_SYNC_MIN_INTERVAL_MS) return
+
+      autoSyncInFlightRef.current = true
+      lastAutoSyncAtRef.current = now
+      try {
+        console.info('[auto-sync] refresh requested', { reason })
+        await loadPrivateData()
+      } finally {
+        autoSyncInFlightRef.current = false
+      }
+    },
+    [auth, isLoading, loadPrivateData, session]
+  )
+
   const refreshQuota = useCallback(async () => {
     try {
       const quota = await fetchQuotaStatus()
@@ -608,6 +637,76 @@ export default function App() {
     if (!session) return
     void loadPrivateData()
   }, [loadPrivateData, session])
+
+  useEffect(() => {
+    if (session) return
+    autoSyncInFlightRef.current = false
+    lastAutoSyncAtRef.current = 0
+  }, [session])
+
+  useEffect(() => {
+    if (!session || !('serviceWorker' in navigator)) return
+
+    const handleSwMessage = (event: MessageEvent) => {
+      const data = event.data as Partial<SwRefreshMessage> | undefined
+      if (!data || data.type !== 'REFRESH_DATA') return
+      void runAutoSyncRefresh(data.reason ?? 'sw-message')
+    }
+
+    navigator.serviceWorker.addEventListener('message', handleSwMessage)
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage)
+    }
+  }, [runAutoSyncRefresh, session])
+
+  useEffect(() => {
+    if (!session || typeof window === 'undefined' || typeof document === 'undefined') return
+
+    let intervalId: number | null = null
+
+    const startVisiblePolling = () => {
+      if (intervalId !== null || document.visibilityState !== 'visible') return
+      intervalId = window.setInterval(() => {
+        if (document.visibilityState !== 'visible') return
+        void runAutoSyncRefresh('visible-polling')
+      }, AUTO_SYNC_POLL_INTERVAL_MS)
+    }
+
+    const stopVisiblePolling = () => {
+      if (intervalId === null) return
+      window.clearInterval(intervalId)
+      intervalId = null
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void runAutoSyncRefresh('visibilitychange')
+        startVisiblePolling()
+        return
+      }
+      stopVisiblePolling()
+    }
+
+    const handleFocus = () => {
+      void runAutoSyncRefresh('focus')
+    }
+
+    const handleOnline = () => {
+      void runAutoSyncRefresh('online')
+    }
+
+    startVisiblePolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      stopVisiblePolling()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [runAutoSyncRefresh, session])
 
   const itemsByTab = useMemo(() => {
     const source = layout ?? catalog
