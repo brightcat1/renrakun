@@ -303,7 +303,7 @@ const MESSAGES: Record<Language, Messages> = {
     intentBuy: '買ってほしい',
     intentVisit: '行きたい',
     adminTitle: 'グループ専用アイテムの追加',
-    adminLead: 'このグループを作成した人のみ、タブ・アイテム・店舗を追加/管理できます。',
+    adminLead: 'このグループを作成した人のみ、タブ・アイテム・場所を追加/管理できます。',
     newTab: '新しいタブ名',
     newTabPlaceholder: '例: 日用品',
     addTab: 'タブを追加',
@@ -313,13 +313,13 @@ const MESSAGES: Record<Language, Messages> = {
     addItem: 'アイテムを追加',
     customTabsSection: '追加したタブの削除',
     customItemsSection: '追加したアイテムの削除',
-    customStoresSection: '追加した店舗の削除',
+    customStoresSection: '追加した場所の削除',
     noCustomTabs: '削除できるタブはありません',
     noCustomItems: 'このタブに削除できるアイテムはありません',
-    noCustomStores: '削除できる店舗はありません',
-    newStore: '新しい店舗名',
+    noCustomStores: '削除できる場所はありません',
+    newStore: '新しい場所名',
     newStorePlaceholder: '例: コストコ',
-    addStore: '店舗を追加',
+    addStore: '場所を追加',
     deleteAction: '削除',
     deleteCancel: '取り消し',
     deleteConfirm: '削除する',
@@ -330,7 +330,7 @@ const MESSAGES: Record<Language, Messages> = {
     cartEmpty: 'アイテムがありません',
     cartHintBuy: '必要なものを追加して送信してください。',
     cartHintVisit: '行きたい場所を1つ選んで送信してください。',
-    cartStoreLabel: '店舗',
+    cartStoreLabel: '場所',
     cartClearStore: '解除',
     addToCartLabel: '追加',
     removeFromCartLabel: '減らす',
@@ -361,7 +361,7 @@ const MESSAGES: Record<Language, Messages> = {
       completeFailed: '完了への更新に失敗しました',
       addTabFailed: 'タブ追加に失敗しました',
       addItemFailed: 'アイテム追加に失敗しました',
-      addStoreFailed: '店舗追加に失敗しました',
+      addStoreFailed: '場所追加に失敗しました',
       clipboardFailed: 'クリップボードへのコピーに失敗しました。',
       deleteTabFailed: 'タブ削除に失敗しました',
       deleteItemFailed: 'アイテム削除に失敗しました',
@@ -374,10 +374,10 @@ const MESSAGES: Record<Language, Messages> = {
       pushEnabled: '通知を有効化しました。',
       tabAdded: (name) => `タブを追加しました: ${name}`,
       itemAdded: (name) => `アイテムを追加しました: ${name}`,
-      storeAdded: (name) => `店舗を追加しました: ${name}`,
+      storeAdded: (name) => `場所を追加しました: ${name}`,
       tabDeleted: (name) => `タブを削除しました: ${name}`,
       itemDeleted: (name) => `アイテムを削除しました: ${name}`,
-      storeDeleted: (name) => `店舗を削除しました: ${name}`,
+      storeDeleted: (name) => `場所を削除しました: ${name}`,
       inviteLinkCopied: '招待リンクをコピーしました。'
     }
   },
@@ -475,7 +475,7 @@ const MESSAGES: Record<Language, Messages> = {
     intentBuy: 'Need to buy',
     intentVisit: 'Want to visit',
     adminTitle: 'Add group-only items',
-    adminLead: 'Only the person who created this group can add and manage tabs, items, and stores.',
+    adminLead: 'Only the person who created this group can add and manage tabs, items, and places.',
     newTab: 'New tab name',
     newTabPlaceholder: 'e.g. Household',
     addTab: 'Add tab',
@@ -485,13 +485,13 @@ const MESSAGES: Record<Language, Messages> = {
     addItem: 'Add item',
     customTabsSection: 'Delete added tabs',
     customItemsSection: 'Delete added items',
-    customStoresSection: 'Delete added stores',
+    customStoresSection: 'Delete added places',
     noCustomTabs: 'No added tabs to delete',
     noCustomItems: 'No added items in this tab',
-    noCustomStores: 'No added stores to delete',
-    newStore: 'New store name',
+    noCustomStores: 'No added places to delete',
+    newStore: 'New place name',
     newStorePlaceholder: 'e.g. Costco',
-    addStore: 'Add store',
+    addStore: 'Add place',
     deleteAction: 'Delete',
     deleteCancel: 'Cancel',
     deleteConfirm: 'Delete',
@@ -502,7 +502,7 @@ const MESSAGES: Record<Language, Messages> = {
     cartEmpty: 'No items',
     cartHintBuy: 'Add items and send your request.',
     cartHintVisit: 'Select one place and send your visit request.',
-    cartStoreLabel: 'Store',
+    cartStoreLabel: 'Place',
     cartClearStore: 'Clear',
     addToCartLabel: 'Add',
     removeFromCartLabel: 'Decrease',
@@ -533,7 +533,7 @@ const MESSAGES: Record<Language, Messages> = {
       completeFailed: 'Failed to update status to completed',
       addTabFailed: 'Failed to add custom tab',
       addItemFailed: 'Failed to add custom item',
-      addStoreFailed: 'Failed to add custom store',
+      addStoreFailed: 'Failed to add custom place',
       clipboardFailed: 'Failed to copy to clipboard.',
       deleteTabFailed: 'Failed to delete tab',
       deleteItemFailed: 'Failed to delete item',
@@ -546,10 +546,10 @@ const MESSAGES: Record<Language, Messages> = {
       pushEnabled: 'Notifications enabled.',
       tabAdded: (name) => `Added tab: ${name}`,
       itemAdded: (name) => `Added item: ${name}`,
-      storeAdded: (name) => `Added store: ${name}`,
+      storeAdded: (name) => `Added place: ${name}`,
       tabDeleted: (name) => `Deleted tab: ${name}`,
       itemDeleted: (name) => `Deleted item: ${name}`,
-      storeDeleted: (name) => `Deleted store: ${name}`,
+      storeDeleted: (name) => `Deleted place: ${name}`,
       inviteLinkCopied: 'Invite link copied.'
     }
   }
@@ -1035,27 +1035,28 @@ export default function App() {
       : 'This environment cannot use notifications. Try a supported browser or the mobile Home Screen app.')
   const intentBuyLabel = messages.intentBuy || (language === 'ja' ? '買ってほしい' : 'Need to buy')
   const intentVisitLabel = messages.intentVisit || (language === 'ja' ? '行きたい' : 'Want to visit')
+  const isVisitIntent = requestIntent === 'visit'
   const customStoresSection =
-    messages.customStoresSection || (language === 'ja' ? '追加した店舗の削除' : 'Delete added stores')
+    messages.customStoresSection || (language === 'ja' ? '追加した場所の削除' : 'Delete added places')
   const noCustomStores =
-    messages.noCustomStores || (language === 'ja' ? '削除できる店舗はありません' : 'No added stores to delete')
-  const newStoreLabel = messages.newStore || (language === 'ja' ? '新しい店舗名' : 'New store name')
+    messages.noCustomStores || (language === 'ja' ? '削除できる場所はありません' : 'No added places to delete')
+  const newStoreLabel = messages.newStore || (language === 'ja' ? '新しい場所名' : 'New place name')
   const newStorePlaceholder =
     messages.newStorePlaceholder || (language === 'ja' ? '例: コストコ' : 'e.g. Costco')
-  const addStoreLabel = messages.addStore || (language === 'ja' ? '店舗を追加' : 'Add store')
-  const cartStoreLabel = messages.cartStoreLabel || (language === 'ja' ? '店舗' : 'Store')
+  const addStoreLabel = messages.addStore || (language === 'ja' ? '場所を追加' : 'Add place')
+  const cartStoreLabel = messages.cartStoreLabel || (language === 'ja' ? '場所' : 'Place')
   const cartClearStoreLabel = messages.cartClearStore || (language === 'ja' ? '解除' : 'Clear')
   const addToCartLabel = messages.addToCartLabel || (language === 'ja' ? '追加' : 'Add')
   const removeFromCartLabel = messages.removeFromCartLabel || (language === 'ja' ? '減らす' : 'Decrease')
-  const cartHint =
-    requestIntent === 'visit'
-      ? language === 'ja'
-        ? '行きたい場所を1つ選んで送信してください。'
-        : 'Select one place and send your visit request.'
-      : language === 'ja'
-        ? '必要なものを追加して送信してください。'
-        : 'Add items and send your request.'
-  const itemButtonsDisabled = requestIntent === 'visit'
+  const cartHint = useMemo(
+    () =>
+      isVisitIntent
+        ? (messages.cartHintVisit ?? (language === 'ja' ? '行きたい場所を1つ選んで送信してください。' : 'Select one place and send your visit request.'))
+        : (messages.cartHintBuy ?? (language === 'ja' ? '必要なものを追加して送信してください。' : 'Add items and send your request.')),
+    [isVisitIntent, language, messages.cartHintVisit, messages.cartHintBuy]
+  )
+  const cartHintKey = `cart-hint-${isVisitIntent ? 'visit' : 'buy'}-${language}`
+  const itemButtonsDisabled = isVisitIntent
   const visitModeItemDisabledHint =
     language === 'ja'
       ? '「行きたい」ではアイテムを追加できません。行きたい場所を選択してください。'
@@ -1292,16 +1293,29 @@ export default function App() {
     setSelectedStoreId(undefined)
   }, [])
 
+  const switchIntent = useCallback((nextIntent: RequestIntent) => {
+    setErrorText((current) => {
+      if (!current) return current
+      const visitRequiredText = messages.errors.visitStoreRequired ?? visitStoreRequiredMessage
+      if (current === visitRequiredText || current === messages.errors.cartEmpty) {
+        return ''
+      }
+      return current
+    })
+    if (nextIntent === requestIntent) return
+    if (requestIntent === 'buy' && nextIntent === 'visit') {
+      setCart({})
+    }
+    setRequestIntent(nextIntent)
+  }, [messages.errors.cartEmpty, messages.errors.visitStoreRequired, requestIntent, visitStoreRequiredMessage])
+
   const handleSwitchToBuy = useCallback(() => {
-    setErrorText('')
-    setRequestIntent('buy')
-  }, [])
+    switchIntent('buy')
+  }, [switchIntent])
 
   const handleSwitchToVisit = useCallback(() => {
-    setErrorText('')
-    setCart({})
-    setRequestIntent('visit')
-  }, [])
+    switchIntent('visit')
+  }, [switchIntent])
 
   const handleDecreaseFromCart = useCallback((itemId: string) => {
     setCart((current) => {
@@ -1440,8 +1454,8 @@ export default function App() {
         messages.statusTexts.storeAdded
           ? messages.statusTexts.storeAdded(created.name)
           : language === 'ja'
-            ? `店舗「${created.name}」を追加しました。`
-            : `Added store: ${created.name}`
+            ? `場所「${created.name}」を追加しました。`
+            : `Added place: ${created.name}`
       )
       await loadPrivateData()
       setSelectedStoreId(created.id)
@@ -1481,8 +1495,8 @@ export default function App() {
           messages.statusTexts.storeDeleted
             ? messages.statusTexts.storeDeleted(deleteTarget.name)
             : language === 'ja'
-              ? `店舗「${deleteTarget.name}」を削除しました。`
-              : `Deleted store: ${deleteTarget.name}`
+              ? `場所「${deleteTarget.name}」を削除しました。`
+              : `Deleted place: ${deleteTarget.name}`
         )
       }
       setDeleteTarget(null)
@@ -2082,7 +2096,7 @@ export default function App() {
                     ? messages.requestOwnSuffix
                     : messages.requestOtherSuffix
                 const requestSubject = isVisitIntent
-                  ? (event.storeName ?? (language === 'ja' ? '店舗' : 'a place'))
+                  ? (event.storeName ?? (language === 'ja' ? '場所' : 'a place'))
                   : (itemText || (language === 'ja' ? '項目' : 'items'))
                 const visitExtra =
                   isVisitIntent && itemText
@@ -2149,7 +2163,7 @@ export default function App() {
           <h3>
             {messages.cartTitle} ({cartCount})
           </h3>
-          <p>{cartHint}</p>
+          <p key={cartHintKey}>{cartHint}</p>
         </div>
         {selectedStoreName && (
           <div className="cart-store-row">
@@ -2198,8 +2212,8 @@ export default function App() {
                 : deleteTarget.kind === 'item'
                   ? messages.deleteModalBodyItem(deleteTarget.name)
                   : language === 'ja'
-                    ? `店舗「${deleteTarget.name}」を削除します。よろしいですか？`
-                    : `Delete store "${deleteTarget.name}"?`}
+                    ? `場所「${deleteTarget.name}」を削除します。よろしいですか？`
+                    : `Delete place "${deleteTarget.name}"?`}
             </p>
             <div className="modal-actions">
               <button type="button" onClick={() => setDeleteTarget(null)}>
