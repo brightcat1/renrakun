@@ -1,7 +1,7 @@
 # renrakun
 
-`renrakun` is a household restock messenger PWA built for tap-only interactions.  
-It keeps shopping requests out of daily chat noise with a dedicated panel + inbox workflow.
+`renrakun` is a household request messenger PWA built for tap-only interactions.  
+It keeps "Need to buy / Want to visit" requests out of daily chat noise with a dedicated panel + inbox workflow.
 
 ## MVP Features
 
