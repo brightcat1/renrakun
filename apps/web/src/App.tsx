@@ -329,7 +329,7 @@ const MESSAGES: Record<Language, Messages> = {
     cartTitle: 'カート',
     cartEmpty: 'アイテムがありません',
     cartHintBuy: '必要なものを追加して送信してください。',
-    cartHintVisit: '行きたい店舗を1つ選んで送信してください。',
+    cartHintVisit: '行きたい場所を1つ選んで送信してください。',
     cartStoreLabel: '店舗',
     cartClearStore: '解除',
     addToCartLabel: '追加',
@@ -356,7 +356,7 @@ const MESSAGES: Record<Language, Messages> = {
       pushFailed: '通知の設定に失敗しました',
       cartEmpty: 'カートが空です。',
       sendFailed: '依頼の送信に失敗しました',
-      visitStoreRequired: '行きたい依頼には店舗の選択が必要です。',
+      visitStoreRequired: '行きたい依頼には場所の選択が必要です。',
       ackFailed: '対応中への更新に失敗しました',
       completeFailed: '完了への更新に失敗しました',
       addTabFailed: 'タブ追加に失敗しました',
@@ -501,7 +501,7 @@ const MESSAGES: Record<Language, Messages> = {
     cartTitle: 'Cart',
     cartEmpty: 'No items',
     cartHintBuy: 'Add items and send your request.',
-    cartHintVisit: 'Select one store and send your visit request.',
+    cartHintVisit: 'Select one place and send your visit request.',
     cartStoreLabel: 'Store',
     cartClearStore: 'Clear',
     addToCartLabel: 'Add',
@@ -528,7 +528,7 @@ const MESSAGES: Record<Language, Messages> = {
       pushFailed: 'Failed to enable notifications',
       cartEmpty: 'Cart is empty.',
       sendFailed: 'Failed to send request',
-      visitStoreRequired: 'Select a store for a visit request.',
+      visitStoreRequired: 'Select a place for a visit request.',
       ackFailed: 'Failed to update status to acknowledged',
       completeFailed: 'Failed to update status to completed',
       addTabFailed: 'Failed to add custom tab',
@@ -1049,11 +1049,21 @@ export default function App() {
   const removeFromCartLabel = messages.removeFromCartLabel || (language === 'ja' ? '減らす' : 'Decrease')
   const cartHint =
     requestIntent === 'visit'
-      ? messages.cartHintVisit || (language === 'ja' ? '行きたい店舗を1つ選んで送信してください。' : 'Select one store and send your visit request.')
-      : messages.cartHintBuy || (language === 'ja' ? '必要なものを追加して送信してください。' : 'Add items and send your request.')
+      ? language === 'ja'
+        ? '行きたい場所を1つ選んで送信してください。'
+        : 'Select one place and send your visit request.'
+      : language === 'ja'
+        ? '必要なものを追加して送信してください。'
+        : 'Add items and send your request.'
   const itemButtonsDisabled = requestIntent === 'visit'
   const visitModeItemDisabledHint =
-    language === 'ja' ? '「行きたい」ではアイテムを追加できません。店舗を選択してください。' : 'Item add is disabled in "Want to visit". Select a store.'
+    language === 'ja'
+      ? '「行きたい」ではアイテムを追加できません。行きたい場所を選択してください。'
+      : 'Item add is disabled in "Want to visit". Select a place.'
+  const visitStoreRequiredMessage =
+    language === 'ja'
+      ? '行きたい依頼には場所の選択が必要です。'
+      : 'Select a place for a visit request.'
   const showActionToast = useCallback((message: string) => {
     if (!message.trim()) return
     if (toastTimerRef.current !== null) {
@@ -1282,6 +1292,17 @@ export default function App() {
     setSelectedStoreId(undefined)
   }, [])
 
+  const handleSwitchToBuy = useCallback(() => {
+    setErrorText('')
+    setRequestIntent('buy')
+  }, [])
+
+  const handleSwitchToVisit = useCallback(() => {
+    setErrorText('')
+    setCart({})
+    setRequestIntent('visit')
+  }, [])
+
   const handleDecreaseFromCart = useCallback((itemId: string) => {
     setCart((current) => {
       const next = { ...current }
@@ -1302,14 +1323,17 @@ export default function App() {
       return
     }
     if (requestIntent === 'visit' && !selectedStoreId) {
-      setErrorText(messages.errors.visitStoreRequired ?? (language === 'ja' ? '行きたい依頼には店舗の選択が必要です。' : 'Select a store for a visit request.'))
+      setErrorText(visitStoreRequiredMessage)
       return
     }
 
     setIsLoading(true)
     setErrorText('')
     try {
-      const itemIds = cartEntries.flatMap(([itemId, qty]) => new Array(qty).fill(itemId))
+      const itemIds =
+        requestIntent === 'buy'
+          ? cartEntries.flatMap(([itemId, qty]) => new Array(qty).fill(itemId))
+          : []
       const result = await sendRequest(auth, {
         groupId: session.groupId,
         senderMemberId: session.memberId,
@@ -1331,7 +1355,6 @@ export default function App() {
     applyError,
     auth,
     cartEntries,
-    language,
     loadPrivateData,
     messages.errors.cartEmpty,
     messages.errors.sendFailed,
@@ -1339,7 +1362,8 @@ export default function App() {
     requestIntent,
     selectedStoreId,
     session,
-    showActionToast
+    showActionToast,
+    visitStoreRequiredMessage
   ])
 
   const handleAck = useCallback(
@@ -2109,14 +2133,14 @@ export default function App() {
           <button
             type="button"
             className={requestIntent === 'buy' ? 'active' : ''}
-            onClick={() => setRequestIntent('buy')}
+            onClick={handleSwitchToBuy}
           >
             {intentBuyLabel}
           </button>
           <button
             type="button"
             className={requestIntent === 'visit' ? 'active' : ''}
-            onClick={() => setRequestIntent('visit')}
+            onClick={handleSwitchToVisit}
           >
             {intentVisitLabel}
           </button>

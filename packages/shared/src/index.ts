@@ -80,6 +80,13 @@ export const createRequestSchema = z
         message: 'visit intent requires storeId'
       })
     }
+    if (intent === 'visit' && value.itemIds.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['itemIds'],
+        message: 'visit intent must not include items'
+      })
+    }
   })
 
 export const createCustomTabSchema = z.object({
