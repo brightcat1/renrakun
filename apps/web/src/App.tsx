@@ -273,8 +273,7 @@ const MESSAGES: Record<Language, Messages> = {
       'ブラウザの通知許可をONにする',
       'アプリ内「通知を有効化/再同期」を押す'
     ],
-    notifyGuidePlatformNote:
-      'OS・ブラウザにより表示名や手順が異なる場合があります。Android/PCのインストール（ホーム画面追加）は任意ですが推奨です。',
+    notifyGuidePlatformNote: 'OS・ブラウザにより表示名や手順が異なる場合があります。',
     notifyGuideBehaviorTitle: '通知の届き方',
     notifyGuideBehaviorPoints: [
       '新しい依頼: 同じグループの通知ONメンバー（送信者以外）に届きます。',
@@ -446,8 +445,7 @@ const MESSAGES: Record<Language, Messages> = {
       'Allow browser notifications for this site',
       'Tap "Enable notifications" or "Resync notifications" in the app'
     ],
-    notifyGuidePlatformNote:
-      'Exact labels and steps may vary by OS and browser. Install/Add-to-home-screen is optional on Android/PC (recommended).',
+    notifyGuidePlatformNote: 'Exact labels and steps may vary by OS and browser.',
     notifyGuideBehaviorTitle: 'How notifications are delivered',
     notifyGuideBehaviorPoints: [
       'New request: sent to notification-enabled members in the same group (except the sender).',
@@ -1007,8 +1005,8 @@ export default function App() {
   const notifyGuidePlatformNote =
     messages.notifyGuidePlatformNote ||
     (language === 'ja'
-      ? 'OS・ブラウザにより表示名や手順が異なる場合があります。Android/PCのインストール（ホーム画面追加）は任意ですが推奨です。'
-      : 'Exact labels and steps may vary by OS and browser. Install/Add-to-home-screen is optional on Android/PC (recommended).')
+      ? 'OS・ブラウザにより表示名や手順が異なる場合があります。'
+      : 'Exact labels and steps may vary by OS and browser.')
   const notifyGuideBehaviorTitle =
     messages.notifyGuideBehaviorTitle || (language === 'ja' ? '通知の届き方' : 'How notifications are delivered')
   const notifyGuideBehaviorPoints = messages.notifyGuideBehaviorPoints || [
@@ -1767,22 +1765,6 @@ export default function App() {
               <ul>
                 {notifyGuidePlatformIOS.map((step) => (
                   <li key={`ios-${step}`}>{step}</li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>Android</h3>
-              <ul>
-                {notifyGuidePlatformAndroid.map((step) => (
-                  <li key={`android-${step}`}>{step}</li>
-                ))}
-              </ul>
-            </section>
-            <section>
-              <h3>PC</h3>
-              <ul>
-                {notifyGuidePlatformPC.map((step) => (
-                  <li key={`pc-${step}`}>{step}</li>
                 ))}
               </ul>
             </section>
