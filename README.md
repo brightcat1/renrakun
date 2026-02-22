@@ -79,5 +79,5 @@ Push shows a concise summary (who + what) to reduce app-open friction.
 
 ## Notes / 補足
 
-- This README is portfolio-focused (screenshot-first). See [README.en.md](README.en.md) for technical details and usage.
-- このREADMEはポートフォリオ向けに画像中心で構成されています。技術詳細や運用手順は [README.ja.md](README.ja.md) を参照してください。
+- This README is a visual overview (screenshot-first). See [README.en.md](README.en.md) for technical details and usage.
+- このREADMEは、機能を直感的に伝えるため画像中心に構成されています。技術的な詳細は [README.ja.md](README.ja.md) を参照してください。
