@@ -255,7 +255,7 @@ const MESSAGES: Record<Language, Messages> = {
     memberResyncHint: '通知が届かない場合は「通知を再同期」を押してください。',
     notifyGuideTitle: '通知の使い方',
     notifyGuideSummary:
-      'iOSはホーム画面に追加したアプリから通知を有効化してください。Android/PCはインストールまたは通知許可後に「通知を有効化/再同期」を押してください。',
+      'iOSはホーム画面に追加したWebアプリからのみ通知を有効化できます。Android/PCはブラウザの通知許可をONにして、アプリ内「通知を有効化/再同期」を押してください。',
     notifyGuideDetailsTitle: '詳しい手順を見る',
     notifyGuidePlatformIOS: [
       'Safariでれんらくんを開く',
@@ -265,15 +265,16 @@ const MESSAGES: Record<Language, Messages> = {
     ],
     notifyGuidePlatformAndroid: [
       'ブラウザでれんらくんを開く',
-      '「アプリをインストール」または「ホーム画面に追加」を選ぶ',
-      'アプリ内「通知を有効化」を押して許可する'
+      'ブラウザの通知許可をONにする',
+      'アプリ内「通知を有効化/再同期」を押す'
     ],
     notifyGuidePlatformPC: [
       'Chrome/Edgeなど対応ブラウザでれんらくんを開く',
-      'アドレスバー等のインストールUIがあればインストールする',
-      'ブラウザの通知許可をONにする'
+      'ブラウザの通知許可をONにする',
+      'アプリ内「通知を有効化/再同期」を押す'
     ],
-    notifyGuidePlatformNote: 'OS・ブラウザにより表示名や手順が異なる場合があります。',
+    notifyGuidePlatformNote:
+      'OS・ブラウザにより表示名や手順が異なる場合があります。Android/PCのインストール（ホーム画面追加）は任意ですが推奨です。',
     notifyGuideBehaviorTitle: '通知の届き方',
     notifyGuideBehaviorPoints: [
       '新しい依頼: 同じグループの通知ONメンバー（送信者以外）に届きます。',
@@ -283,7 +284,7 @@ const MESSAGES: Record<Language, Messages> = {
     notifyGuideUnsupported:
       'このブラウザでは通知機能を利用できません。対応ブラウザまたはホーム画面アプリで利用してください。',
     pushSupportBestEffortNote:
-      '通知はスマホのホーム画面アプリでの利用が最も安定します。PCはブラウザ/OS設定により動作が変わる場合があります。',
+      '通知はスマホ利用が最も安定し、iOSはホーム画面アプリが必須です。PCはブラウザ/OS設定により動作が変わる場合があります。',
     pushSupportUnsupportedNote:
       'この環境では通知を利用できません。スマホのホーム画面アプリ、または対応ブラウザでお試しください。',
     touchLoading: '項目を読み込み中です。',
@@ -427,7 +428,7 @@ const MESSAGES: Record<Language, Messages> = {
     memberResyncHint: 'If notifications do not arrive, tap "Resync notifications".',
     notifyGuideTitle: 'How to enable notifications',
     notifyGuideSummary:
-      'On iOS, enable notifications from the Home Screen app. On Android/PC, install (optional) and allow browser notifications, then tap "Enable notifications" or "Resync notifications".',
+      'On iOS, notifications work only from the Home Screen web app. On Android/PC, allow browser notifications, then tap "Enable notifications" or "Resync notifications" in the app.',
     notifyGuideDetailsTitle: 'View setup steps',
     notifyGuidePlatformIOS: [
       'Open renrakun in Safari',
@@ -437,15 +438,16 @@ const MESSAGES: Record<Language, Messages> = {
     ],
     notifyGuidePlatformAndroid: [
       'Open renrakun in your browser',
-      'Choose "Install app" or "Add to Home screen"',
-      'Tap "Enable notifications" in the app and allow notifications'
+      'Allow browser notifications for this site',
+      'Tap "Enable notifications" or "Resync notifications" in the app'
     ],
     notifyGuidePlatformPC: [
       'Open renrakun in a supported browser (for example Chrome/Edge)',
-      'Install from address bar UI if available',
-      'Allow browser notifications for this site'
+      'Allow browser notifications for this site',
+      'Tap "Enable notifications" or "Resync notifications" in the app'
     ],
-    notifyGuidePlatformNote: 'Exact labels and steps may vary by OS and browser.',
+    notifyGuidePlatformNote:
+      'Exact labels and steps may vary by OS and browser. Install/Add-to-home-screen is optional on Android/PC (recommended).',
     notifyGuideBehaviorTitle: 'How notifications are delivered',
     notifyGuideBehaviorPoints: [
       'New request: sent to notification-enabled members in the same group (except the sender).',
@@ -455,7 +457,7 @@ const MESSAGES: Record<Language, Messages> = {
     notifyGuideUnsupported:
       'Notifications are not supported in this browser. Use a supported browser or a Home Screen app.',
     pushSupportBestEffortNote:
-      'Notifications are most reliable in the mobile Home Screen app. On PC, behavior depends on browser and OS settings.',
+      'Notifications are most reliable on mobile, and iOS requires the Home Screen app. On PC, behavior depends on browser and OS settings.',
     pushSupportUnsupportedNote:
       'This environment cannot use notifications. Try a supported browser or the mobile Home Screen app.',
     touchLoading: 'Loading items...',
@@ -975,8 +977,8 @@ export default function App() {
   const notifyGuideSummary =
     messages.notifyGuideSummary ||
     (language === 'ja'
-      ? 'iOSはホーム画面に追加したアプリから通知を有効化してください。Android/PCは通知許可後に「通知を有効化/再同期」を押してください。'
-      : 'On iOS, use the Home Screen app and enable notifications. On Android/PC, allow notifications then tap "Enable notifications" or "Resync notifications".')
+      ? 'iOSはホーム画面に追加したWebアプリからのみ通知を有効化できます。Android/PCはブラウザの通知許可をONにして、アプリ内「通知を有効化/再同期」を押してください。'
+      : 'On iOS, notifications work only from the Home Screen web app. On Android/PC, allow browser notifications, then tap "Enable notifications" or "Resync notifications" in the app.')
   const notifyGuideDetailsTitle = messages.notifyGuideDetailsTitle || (language === 'ja' ? '詳しい手順を見る' : 'View setup steps')
   const notifyGuidePlatformIOS = messages.notifyGuidePlatformIOS || [
     language === 'ja' ? 'Safariでれんらくんを開く' : 'Open renrakun in Safari',
@@ -987,24 +989,26 @@ export default function App() {
   const notifyGuidePlatformAndroid = messages.notifyGuidePlatformAndroid || [
     language === 'ja' ? 'ブラウザでれんらくんを開く' : 'Open renrakun in your browser',
     language === 'ja'
-      ? '「アプリをインストール」または「ホーム画面に追加」を選ぶ'
-      : 'Choose "Install app" or "Add to Home screen"',
-    language === 'ja' ? 'アプリ内「通知を有効化」を押して許可する' : 'Tap "Enable notifications" in the app and allow notifications'
+      ? 'ブラウザの通知許可をONにする'
+      : 'Allow browser notifications for this site',
+    language === 'ja'
+      ? 'アプリ内「通知を有効化/再同期」を押す'
+      : 'Tap "Enable notifications" or "Resync notifications" in the app'
   ]
   const notifyGuidePlatformPC = messages.notifyGuidePlatformPC || [
     language === 'ja'
       ? 'Chrome/Edgeなど対応ブラウザでれんらくんを開く'
       : 'Open renrakun in a supported browser (for example Chrome/Edge)',
+    language === 'ja' ? 'ブラウザの通知許可をONにする' : 'Allow browser notifications for this site',
     language === 'ja'
-      ? 'アドレスバー等のインストールUIがあればインストールする'
-      : 'Install from address bar UI if available',
-    language === 'ja' ? 'ブラウザの通知許可をONにする' : 'Allow browser notifications for this site'
+      ? 'アプリ内「通知を有効化/再同期」を押す'
+      : 'Tap "Enable notifications" or "Resync notifications" in the app'
   ]
   const notifyGuidePlatformNote =
     messages.notifyGuidePlatformNote ||
     (language === 'ja'
-      ? 'OS・ブラウザにより表示名や手順が異なる場合があります。'
-      : 'Exact labels and steps may vary by OS and browser.')
+      ? 'OS・ブラウザにより表示名や手順が異なる場合があります。Android/PCのインストール（ホーム画面追加）は任意ですが推奨です。'
+      : 'Exact labels and steps may vary by OS and browser. Install/Add-to-home-screen is optional on Android/PC (recommended).')
   const notifyGuideBehaviorTitle =
     messages.notifyGuideBehaviorTitle || (language === 'ja' ? '通知の届き方' : 'How notifications are delivered')
   const notifyGuideBehaviorPoints = messages.notifyGuideBehaviorPoints || [
@@ -1026,8 +1030,8 @@ export default function App() {
   const pushSupportBestEffortNote =
     messages.pushSupportBestEffortNote ||
     (language === 'ja'
-      ? '通知はスマホのホーム画面アプリでの利用が最も安定します。PCはブラウザ/OS設定により動作が変わる場合があります。'
-      : 'Notifications are most reliable in the mobile Home Screen app. On PC, behavior depends on browser and OS settings.')
+      ? '通知はスマホ利用が最も安定し、iOSはホーム画面アプリが必須です。PCはブラウザ/OS設定により動作が変わる場合があります。'
+      : 'Notifications are most reliable on mobile, and iOS requires the Home Screen app. On PC, behavior depends on browser and OS settings.')
   const pushSupportUnsupportedNote =
     messages.pushSupportUnsupportedNote ||
     (language === 'ja'
@@ -1048,14 +1052,10 @@ export default function App() {
   const cartClearStoreLabel = messages.cartClearStore || (language === 'ja' ? '解除' : 'Clear')
   const addToCartLabel = messages.addToCartLabel || (language === 'ja' ? '追加' : 'Add')
   const removeFromCartLabel = messages.removeFromCartLabel || (language === 'ja' ? '減らす' : 'Decrease')
-  const cartHint = useMemo(
-    () =>
-      isVisitIntent
-        ? (messages.cartHintVisit ?? (language === 'ja' ? '行きたい場所を1つ選んで送信してください。' : 'Select one place and send your visit request.'))
-        : (messages.cartHintBuy ?? (language === 'ja' ? '必要なものを追加して送信してください。' : 'Add items and send your request.')),
-    [isVisitIntent, language, messages.cartHintVisit, messages.cartHintBuy]
-  )
-  const cartHintKey = `cart-hint-${isVisitIntent ? 'visit' : 'buy'}-${language}`
+  const cartHint =
+    isVisitIntent
+      ? (messages.cartHintVisit ?? (language === 'ja' ? '行きたい場所を1つ選んで送信してください。' : 'Select one place and send your visit request.'))
+      : (messages.cartHintBuy ?? (language === 'ja' ? '必要なものを追加して送信してください。' : 'Add items and send your request.'))
   const itemButtonsDisabled = isVisitIntent
   const visitModeItemDisabledHint =
     language === 'ja'
@@ -1895,7 +1895,9 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                {itemButtonsDisabled && <p className="sub-text mode-hint">{visitModeItemDisabledHint}</p>}
+                <p className="sub-text mode-hint" aria-live="polite">
+                  {itemButtonsDisabled ? visitModeItemDisabledHint : ''}
+                </p>
 
                 <div className="store-row">
                   {storeButtons.map((store) => (
@@ -2163,7 +2165,7 @@ export default function App() {
           <h3>
             {messages.cartTitle} ({cartCount})
           </h3>
-          <p key={cartHintKey}>{cartHint}</p>
+          <p>{cartHint}</p>
         </div>
         {selectedStoreName && (
           <div className="cart-store-row">

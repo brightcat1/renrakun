@@ -601,6 +601,8 @@ select {
 
 .mode-hint {
   margin-top: 0.45rem;
+  min-height: 2.4rem;
+  line-height: 1.35;
 }
 
 .store-row {
