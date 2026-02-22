@@ -2,7 +2,8 @@
 
 Tap-first household request app.
 
-会員登録なしで、家庭内の「買ってほしい / 行きたい」依頼をすばやく共有できるPWAです。
+家庭内の「買ってほしい / 行きたい」依頼を、専用タッチパネルでサッと共有できます。
+会員登録なしで、すばやく共有できるPWAです。
 
 - **App URL:** [renrakun.pages.dev](https://renrakun.pages.dev)
 - **日本語ドキュメント:** [README.ja.md](README.ja.md)
@@ -20,15 +21,15 @@ Display name + passphrase only. Invite link sharing is built-in.
   <img src="docs/screenshots/02-onboarding-language-switch-en.png" width="48%">
 </p>
 
-### 2) Member visibility + notification readiness / 参加メンバーと通知状態の可視化
+### 2) Member visibility / 参加メンバーの可視化
 See who is in the group and who has notifications enabled.
 
 グループ参加者と通知状態（通知OK / 未設定）を一目で確認できます。
 
 <img src="docs/screenshots/03-dashboard-members-push-status.png" width="48%">
 
-### 3) Tap-only cart controls / タップ中心のカート操作
-`+` adds, `-` reduces. Store/place is single-select and easy to clear.
+### 3) Tap-only cart controls / タップ中心の操作
+`+` adds, `-` reduces. Place selection is single-select and easy to clear.
 
 `+` で追加、`-` で減算。場所選択は単一選択で、解除も簡単です。
 
@@ -40,11 +41,11 @@ See who is in the group and who has notifications enabled.
 ### 4) Intent switch: Need to buy / Want to visit / 依頼テンプレ切替
 Switch between `Need to buy` and `Want to visit`.
 
-`行きたい` は場所のみ送信です。
+「買ってほしい」と「行きたい」を切り替え。`行きたい` は場所のみ送信です。
 
 <img src="docs/screenshots/06-intent-visit.png" width="48%">
 
-### 5) Admin customization per group / 作成者によるグループ別カスタム管理
+### 5) Admin customization / 作成者によるカスタム管理
 Group creator can add/archive-delete custom tabs, items, and places.
 
 グループ作成者は、カスタムタブ・アイテム・場所を追加/削除できます。
@@ -78,5 +79,5 @@ Push shows a concise summary (who + what) to reduce app-open friction.
 
 ## Notes / 補足
 
-- This top-level README is portfolio-focused and screenshot-first.
-- 技術詳細、運用手順、制限事項は `README.ja.md` / `README.en.md` を参照してください。
+- This README is portfolio-focused (screenshot-first). See [README.en.md](README.en.md) for technical details and usage.
+- このREADMEはポートフォリオ向けに画像中心で構成されています。技術詳細や運用手順は [README.ja.md](README.ja.md) を参照してください。

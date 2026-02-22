@@ -12,6 +12,7 @@ It keeps "Need to buy / Want to visit" requests out of daily chat noise with a d
 - Always-on in-app notification setup guide after login (iOS / Android / PC)
 - Group creator can manage custom tabs/items/places (add + archive-delete)
 - Request template switch: `Need to buy` / `Want to visit`
+- Visual cart feedback (`+` to add items, `-` to reduce from cart)
 - `Want to visit` is place-only (items are cleared on switch, single place selection with quick clear)
 - Free-tier guardrails (daily limits, auto resume, staged cleanup)
 
