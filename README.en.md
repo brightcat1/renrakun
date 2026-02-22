@@ -9,9 +9,10 @@ It keeps shopping requests out of daily chat noise with a dedicated panel + inbo
 - Group join via invite link + passphrase (no account registration)
 - Request status flow: `Requested` / `In progress` / `Completed`
 - Lock-screen push summaries (who + what)
-- Group creator can manage custom tabs/items/stores (add + archive-delete)
+- Always-on in-app notification setup guide after login (iOS / Android / PC)
+- Group creator can manage custom tabs/items/places (add + archive-delete)
 - Request template switch: `Need to buy` / `Want to visit`
-- Clear cart interactions (`+` to add, `-` to reduce, single store selection with quick clear)
+- `Want to visit` is place-only (items are cleared on switch, single place selection with quick clear)
 - Free-tier guardrails (daily limits, auto resume, staged cleanup)
 
 ## Architecture & Tech Stack
@@ -128,10 +129,18 @@ This avoids interactive prompts in GitHub Actions.
 
 If push is not arriving, check in this order:
 
+0. Check the "How to enable notifications" card in the app
+   - iOS: open in Safari, add to Home Screen, then enable notifications from the Home Screen web app (required)
+   - Android/PC: allow browser notifications, then use `Enable notifications/Resync notifications` in the app
+   - PC notifications are best-effort. Mobile is most reliable (on iOS, Home Screen web app is required).
 1. Tap `Resync notifications` in the app
 2. Check member push state in `Members in group`
 3. Verify migration status (`--local` / `--remote`)
 4. Check API logs via `wrangler tail`
+
+Notification delivery rules:
+- New request: sent to notification-enabled members except the sender
+- In progress / Complete: sent to the original request sender
 
 ## PWA Lifecycle & Data Sync (Specifications)
 
@@ -144,44 +153,12 @@ If push is not arriving, check in this order:
 - Auto-sync refresh is serialized and throttled (minimum interval: 5 seconds) and is suppressed while an explicit load is in progress.
 - A manual `Refresh` action remains available as a fallback mechanism.
 
-## Manual Maintenance via Activity Tracking (last_activity_at)
-
-To ensure long-term stability within D1 free-tier storage limits (500MB), the system tracks user activity.
-
-### 1. Design Rationale & Trade-offs
-
-We deliberately prioritized "activity metrics for manual cleanup" over "full automation" for the following reasons:
-
-* **Write Quota Optimization (Rows Written)**: Read-only operations (e.g., fetching inbox, catalog, or layout) do not update the last_activity_at timestamp. This preserves the Cloudflare D1 "Rows Written" quota by avoiding unnecessary writes during routine browsing.
-* **Data Integrity**: Given the personal nature of the data, we avoid the risk of accidental deletion by automated scripts. Final deletion decisions are left to the operator.
-* **Pragmatism**: The text-based data model is extremely lightweight. Since it takes years to reach the 500MB limit, fully automated GC for active groups is currently considered "over-engineering."
-
-### 2. Update Rules
-
-* **Updated on**: Write actions (e.g., group creation/joining, request creation/updates, catalog edits).
-* **Not Updated on**: Read-only APIs (catalog, layout, inbox, push pending, etc.).
-
-### 3. Manual SQL Example (180+ Days Inactive)
-
-SELECT 
-  g.id, 
-  COALESCE(g.last_activity_at, g.created_at) as effective_last_activity, 
-  COUNT(m.id) as members
-FROM groups g
-LEFT JOIN members m ON g.id = m.group_id
-WHERE COALESCE(g.last_activity_at, g.created_at) < date('now', '-180 days') -- 別名ではなく元の式を書く
-  AND NOT EXISTS (
-    SELECT 1 FROM requests r 
-    WHERE r.group_id = g.id AND r.status IN ('requested', 'acknowledged')
-  )
-GROUP BY g.id;
-
 ## Specifications & Limitations
 
-- **iOS Compatibility**: iOS Web Push depends on OS version, Home Screen install, and notification permission.
+- **Notification Support**: On iOS, Web Push works from the Home Screen web app only. On Android/PC, browser notification permission is sufficient.
 - **Privacy**: Lock-screen summaries can expose request text; avoid sensitive data in requests.
 - **Write Limits**: APIs are paused at daily free-tier limits and auto-resume at 00:00 JST to protect infrastructure.
 - **Retention**: Completed requests are purged after 14 days by default. "Requested" and "In progress" statuses are not auto-purged.
 - **Unused Groups**: Based on `last_activity_at`, groups meeting conservative criteria (e.g., single member, no push setup) are staged for cleanup via Cron Trigger (60-day candidate period + 30-day grace).
-- **Custom Store Cleanup**: Store deletion is archive-first. Archived custom stores with no remaining request references are physically removed in daily maintenance after retention.
+- **Custom Place Cleanup**: Place deletion is archive-first. Archived custom places with no remaining request references are physically removed in daily maintenance after retention.
 - **Scope**: Price comparison, inventory sync, and external e-commerce integrations are out of MVP scope.
