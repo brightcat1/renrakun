@@ -95,6 +95,18 @@ interface Messages {
   memberPushNotReady?: string
   memberYouSuffix?: string
   memberResyncHint?: string
+  notifyGuideTitle?: string
+  notifyGuideSummary?: string
+  notifyGuideDetailsTitle?: string
+  notifyGuidePlatformIOS?: string[]
+  notifyGuidePlatformAndroid?: string[]
+  notifyGuidePlatformPC?: string[]
+  notifyGuidePlatformNote?: string
+  notifyGuideBehaviorTitle?: string
+  notifyGuideBehaviorPoints?: string[]
+  notifyGuideUnsupported?: string
+  pushSupportBestEffortNote?: string
+  pushSupportUnsupportedNote?: string
   touchLoading: string
   touchEmpty: string
   inboxTitle: string
@@ -137,12 +149,18 @@ interface Messages {
   deleteModalBodyItem: (name: string) => string
   cartTitle: string
   cartEmpty: string
+  cartHintBuy?: string
+  cartHintVisit?: string
   cartStoreLabel?: string
   cartClearStore?: string
   addToCartLabel?: string
   removeFromCartLabel?: string
   sendRequest: string
   languageSwitch: string
+  toastGroupCreated?: string
+  toastGroupJoined?: string
+  toastPushEnabled?: string
+  toastInviteCopied?: string
   defaultStatus: string
   statusRequested: string
   statusAcknowledged: string
@@ -235,6 +253,39 @@ const MESSAGES: Record<Language, Messages> = {
     memberPushNotReady: '通知未設定',
     memberYouSuffix: '（あなた）',
     memberResyncHint: '通知が届かない場合は「通知を再同期」を押してください。',
+    notifyGuideTitle: '通知の使い方',
+    notifyGuideSummary:
+      'iOSはホーム画面に追加したアプリから通知を有効化してください。Android/PCはインストールまたは通知許可後に「通知を有効化/再同期」を押してください。',
+    notifyGuideDetailsTitle: '詳しい手順を見る',
+    notifyGuidePlatformIOS: [
+      'Safariでれんらくんを開く',
+      '共有メニューから「ホーム画面に追加」を選ぶ',
+      'ホーム画面のアプリアイコンから開く',
+      'アプリ内「通知を有効化」を押して許可する'
+    ],
+    notifyGuidePlatformAndroid: [
+      'ブラウザでれんらくんを開く',
+      '「アプリをインストール」または「ホーム画面に追加」を選ぶ',
+      'アプリ内「通知を有効化」を押して許可する'
+    ],
+    notifyGuidePlatformPC: [
+      'Chrome/Edgeなど対応ブラウザでれんらくんを開く',
+      'アドレスバー等のインストールUIがあればインストールする',
+      'ブラウザの通知許可をONにする'
+    ],
+    notifyGuidePlatformNote: 'OS・ブラウザにより表示名や手順が異なる場合があります。',
+    notifyGuideBehaviorTitle: '通知の届き方',
+    notifyGuideBehaviorPoints: [
+      '新しい依頼: 同じグループの通知ONメンバー（送信者以外）に届きます。',
+      '対応中/完了: 依頼を送った人に届きます。',
+      '「参加中メンバー」で通知OK/通知未設定を確認できます。'
+    ],
+    notifyGuideUnsupported:
+      'このブラウザでは通知機能を利用できません。対応ブラウザまたはホーム画面アプリで利用してください。',
+    pushSupportBestEffortNote:
+      '通知はスマホのホーム画面アプリでの利用が最も安定します。PCはブラウザ/OS設定により動作が変わる場合があります。',
+    pushSupportUnsupportedNote:
+      'この環境では通知を利用できません。スマホのホーム画面アプリ、または対応ブラウザでお試しください。',
     touchLoading: '項目を読み込み中です。',
     touchEmpty: '表示できる項目がありません。更新して再度お試しください。',
     inboxTitle: '受信箱',
@@ -277,12 +328,18 @@ const MESSAGES: Record<Language, Messages> = {
     deleteModalBodyItem: (name) => `アイテム「${name}」を削除します。よろしいですか？`,
     cartTitle: 'カート',
     cartEmpty: 'アイテムがありません',
+    cartHintBuy: '必要なものを追加して送信してください。',
+    cartHintVisit: '行きたい店舗を1つ選んで送信してください。',
     cartStoreLabel: '店舗',
     cartClearStore: '解除',
     addToCartLabel: '追加',
     removeFromCartLabel: '減らす',
     sendRequest: '依頼を送信する',
     languageSwitch: 'English',
+    toastGroupCreated: 'グループを作成しました。招待リンクを共有してください。',
+    toastGroupJoined: 'グループに参加しました。',
+    toastPushEnabled: '通知を有効化しました。',
+    toastInviteCopied: '招待リンクをコピーしました。',
     defaultStatus: 'タブを選んで、必要なものを追加してください。',
     statusRequested: '依頼中',
     statusAcknowledged: '対応中',
@@ -368,6 +425,39 @@ const MESSAGES: Record<Language, Messages> = {
     memberPushNotReady: 'Notifications off',
     memberYouSuffix: '(You)',
     memberResyncHint: 'If notifications do not arrive, tap "Resync notifications".',
+    notifyGuideTitle: 'How to enable notifications',
+    notifyGuideSummary:
+      'On iOS, enable notifications from the Home Screen app. On Android/PC, install (optional) and allow browser notifications, then tap "Enable notifications" or "Resync notifications".',
+    notifyGuideDetailsTitle: 'View setup steps',
+    notifyGuidePlatformIOS: [
+      'Open renrakun in Safari',
+      'Use Share menu -> "Add to Home Screen"',
+      'Open from the Home Screen icon',
+      'Tap "Enable notifications" in the app and allow notifications'
+    ],
+    notifyGuidePlatformAndroid: [
+      'Open renrakun in your browser',
+      'Choose "Install app" or "Add to Home screen"',
+      'Tap "Enable notifications" in the app and allow notifications'
+    ],
+    notifyGuidePlatformPC: [
+      'Open renrakun in a supported browser (for example Chrome/Edge)',
+      'Install from address bar UI if available',
+      'Allow browser notifications for this site'
+    ],
+    notifyGuidePlatformNote: 'Exact labels and steps may vary by OS and browser.',
+    notifyGuideBehaviorTitle: 'How notifications are delivered',
+    notifyGuideBehaviorPoints: [
+      'New request: sent to notification-enabled members in the same group (except the sender).',
+      'In progress / Complete: sent to the person who originally sent the request.',
+      'Use "Members in group" to check notification status.'
+    ],
+    notifyGuideUnsupported:
+      'Notifications are not supported in this browser. Use a supported browser or a Home Screen app.',
+    pushSupportBestEffortNote:
+      'Notifications are most reliable in the mobile Home Screen app. On PC, behavior depends on browser and OS settings.',
+    pushSupportUnsupportedNote:
+      'This environment cannot use notifications. Try a supported browser or the mobile Home Screen app.',
     touchLoading: 'Loading items...',
     touchEmpty: 'No items to show. Please refresh and try again.',
     inboxTitle: 'Inbox',
@@ -410,12 +500,18 @@ const MESSAGES: Record<Language, Messages> = {
     deleteModalBodyItem: (name) => `Delete item "${name}"?`,
     cartTitle: 'Cart',
     cartEmpty: 'No items',
+    cartHintBuy: 'Add items and send your request.',
+    cartHintVisit: 'Select one store and send your visit request.',
     cartStoreLabel: 'Store',
     cartClearStore: 'Clear',
     addToCartLabel: 'Add',
     removeFromCartLabel: 'Decrease',
     sendRequest: 'Send request',
     languageSwitch: '日本語',
+    toastGroupCreated: 'Group created. Share the invite link.',
+    toastGroupJoined: 'Joined the group.',
+    toastPushEnabled: 'Notifications enabled.',
+    toastInviteCopied: 'Invite link copied.',
     defaultStatus: 'Select a tab and tap items to add them.',
     statusRequested: 'Requested',
     statusAcknowledged: 'In progress',
@@ -542,24 +638,42 @@ export default function App() {
   const [customStoreName, setCustomStoreName] = useState('')
   const [customItemTabId, setCustomItemTabId] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
-  const [statusText, setStatusText] = useState(() => MESSAGES[getInitialLanguage()].defaultStatus)
+  const [actionToast, setActionToast] = useState('')
   const [errorText, setErrorText] = useState('')
   const [lastLoadErrorCode, setLastLoadErrorCode] = useState('')
   const [quotaResumeAt, setQuotaResumeAt] = useState<string | null>(null)
   const [inviteFromLink, setInviteFromLink] = useState(false)
   const [showManualJoinInput, setShowManualJoinInput] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(
-    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission
+    () => {
+      if (typeof window === 'undefined') return 'unsupported'
+      const supportsPush =
+        'Notification' in window &&
+        'serviceWorker' in navigator &&
+        'PushManager' in window &&
+        window.isSecureContext
+      return supportsPush ? Notification.permission : 'unsupported'
+    }
   )
   const [isLoading, setIsLoading] = useState(false)
   const lastSyncedMemberIdRef = useRef<string | null>(null)
   const autoSyncInFlightRef = useRef(false)
   const lastAutoSyncAtRef = useRef(0)
+  const toastTimerRef = useRef<number | null>(null)
 
   const auth = useMemo(
     () => (session ? { deviceId, memberId: session.memberId } : null),
     [deviceId, session]
   )
+  const pushCapability = useMemo<'supported' | 'unsupported'>(() => {
+    if (typeof window === 'undefined') return 'unsupported'
+    const supportsPush =
+      'Notification' in window &&
+      'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      window.isSecureContext
+    return supportsPush ? 'supported' : 'unsupported'
+  }, [])
 
   useEffect(() => {
     setApiLanguage(language)
@@ -694,16 +808,11 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    setStatusText((current) => {
-      const isLegacyDefault = current === MESSAGES.ja.defaultStatus || current === MESSAGES.en.defaultStatus
-      return isLegacyDefault ? messages.defaultStatus : current
-    })
-
     setDisplayName((current) => {
       const isLegacyDefault = current === MESSAGES.ja.defaultDisplayName || current === MESSAGES.en.defaultDisplayName
       return isLegacyDefault ? messages.defaultDisplayName : current
     })
-  }, [messages.defaultDisplayName, messages.defaultStatus])
+  }, [messages.defaultDisplayName])
 
   useEffect(() => {
     if (!session) return
@@ -862,6 +971,68 @@ export default function App() {
     (language === 'ja'
       ? '通知が届かない場合は「通知を再同期」を押してください。'
       : 'If notifications do not arrive, tap "Resync notifications".')
+  const notifyGuideTitle = messages.notifyGuideTitle || (language === 'ja' ? '通知の使い方' : 'How to enable notifications')
+  const notifyGuideSummary =
+    messages.notifyGuideSummary ||
+    (language === 'ja'
+      ? 'iOSはホーム画面に追加したアプリから通知を有効化してください。Android/PCは通知許可後に「通知を有効化/再同期」を押してください。'
+      : 'On iOS, use the Home Screen app and enable notifications. On Android/PC, allow notifications then tap "Enable notifications" or "Resync notifications".')
+  const notifyGuideDetailsTitle = messages.notifyGuideDetailsTitle || (language === 'ja' ? '詳しい手順を見る' : 'View setup steps')
+  const notifyGuidePlatformIOS = messages.notifyGuidePlatformIOS || [
+    language === 'ja' ? 'Safariでれんらくんを開く' : 'Open renrakun in Safari',
+    language === 'ja' ? '共有メニューから「ホーム画面に追加」を選ぶ' : 'Use Share menu -> "Add to Home Screen"',
+    language === 'ja' ? 'ホーム画面のアイコンから開く' : 'Open from the Home Screen icon',
+    language === 'ja' ? 'アプリ内「通知を有効化」を押して許可する' : 'Tap "Enable notifications" in the app and allow notifications'
+  ]
+  const notifyGuidePlatformAndroid = messages.notifyGuidePlatformAndroid || [
+    language === 'ja' ? 'ブラウザでれんらくんを開く' : 'Open renrakun in your browser',
+    language === 'ja'
+      ? '「アプリをインストール」または「ホーム画面に追加」を選ぶ'
+      : 'Choose "Install app" or "Add to Home screen"',
+    language === 'ja' ? 'アプリ内「通知を有効化」を押して許可する' : 'Tap "Enable notifications" in the app and allow notifications'
+  ]
+  const notifyGuidePlatformPC = messages.notifyGuidePlatformPC || [
+    language === 'ja'
+      ? 'Chrome/Edgeなど対応ブラウザでれんらくんを開く'
+      : 'Open renrakun in a supported browser (for example Chrome/Edge)',
+    language === 'ja'
+      ? 'アドレスバー等のインストールUIがあればインストールする'
+      : 'Install from address bar UI if available',
+    language === 'ja' ? 'ブラウザの通知許可をONにする' : 'Allow browser notifications for this site'
+  ]
+  const notifyGuidePlatformNote =
+    messages.notifyGuidePlatformNote ||
+    (language === 'ja'
+      ? 'OS・ブラウザにより表示名や手順が異なる場合があります。'
+      : 'Exact labels and steps may vary by OS and browser.')
+  const notifyGuideBehaviorTitle =
+    messages.notifyGuideBehaviorTitle || (language === 'ja' ? '通知の届き方' : 'How notifications are delivered')
+  const notifyGuideBehaviorPoints = messages.notifyGuideBehaviorPoints || [
+    language === 'ja'
+      ? '新しい依頼: 同じグループの通知ONメンバー（送信者以外）に届きます。'
+      : 'New request: sent to notification-enabled members in the same group (except the sender).',
+    language === 'ja'
+      ? '対応中/完了: 依頼を送った人に届きます。'
+      : 'In progress / Complete: sent to the person who originally sent the request.',
+    language === 'ja'
+      ? '「参加中メンバー」で通知OK/通知未設定を確認できます。'
+      : 'Use "Members in group" to check notification status.'
+  ]
+  const notifyGuideUnsupported =
+    messages.notifyGuideUnsupported ||
+    (language === 'ja'
+      ? 'このブラウザでは通知機能を利用できません。対応ブラウザまたはホーム画面アプリで利用してください。'
+      : 'Notifications are not supported in this browser. Use a supported browser or a Home Screen app.')
+  const pushSupportBestEffortNote =
+    messages.pushSupportBestEffortNote ||
+    (language === 'ja'
+      ? '通知はスマホのホーム画面アプリでの利用が最も安定します。PCはブラウザ/OS設定により動作が変わる場合があります。'
+      : 'Notifications are most reliable in the mobile Home Screen app. On PC, behavior depends on browser and OS settings.')
+  const pushSupportUnsupportedNote =
+    messages.pushSupportUnsupportedNote ||
+    (language === 'ja'
+      ? 'この環境では通知を利用できません。スマホのホーム画面アプリ、または対応ブラウザでお試しください。'
+      : 'This environment cannot use notifications. Try a supported browser or the mobile Home Screen app.')
   const intentBuyLabel = messages.intentBuy || (language === 'ja' ? '買ってほしい' : 'Need to buy')
   const intentVisitLabel = messages.intentVisit || (language === 'ja' ? '行きたい' : 'Want to visit')
   const customStoresSection =
@@ -876,9 +1047,38 @@ export default function App() {
   const cartClearStoreLabel = messages.cartClearStore || (language === 'ja' ? '解除' : 'Clear')
   const addToCartLabel = messages.addToCartLabel || (language === 'ja' ? '追加' : 'Add')
   const removeFromCartLabel = messages.removeFromCartLabel || (language === 'ja' ? '減らす' : 'Decrease')
+  const cartHint =
+    requestIntent === 'visit'
+      ? messages.cartHintVisit || (language === 'ja' ? '行きたい店舗を1つ選んで送信してください。' : 'Select one store and send your visit request.')
+      : messages.cartHintBuy || (language === 'ja' ? '必要なものを追加して送信してください。' : 'Add items and send your request.')
   const itemButtonsDisabled = requestIntent === 'visit'
   const visitModeItemDisabledHint =
     language === 'ja' ? '「行きたい」ではアイテムを追加できません。店舗を選択してください。' : 'Item add is disabled in "Want to visit". Select a store.'
+  const showActionToast = useCallback((message: string) => {
+    if (!message.trim()) return
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+    setActionToast(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setActionToast('')
+      toastTimerRef.current = null
+    }, 2800)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (pushCapability === 'supported') return
+    setNotificationPermission('unsupported')
+  }, [pushCapability])
+
   const applyError = useCallback((error: unknown, fallback: string) => {
     if (isQuotaError(error)) {
       setQuotaResumeAt(error.resumeAt ?? null)
@@ -917,7 +1117,9 @@ export default function App() {
         }
         writeSession(nextSession)
         setSession(nextSession)
-        setStatusText(messages.statusTexts.groupCreated)
+        showActionToast(
+          messages.toastGroupCreated ?? messages.statusTexts.groupCreated
+        )
       } else {
         const normalizedInvite = normalizeInviteInput(inviteToken)
         if (!normalizedInvite) {
@@ -939,7 +1141,9 @@ export default function App() {
         }
         writeSession(nextSession)
         setSession(nextSession)
-        setStatusText(messages.statusTexts.groupJoined)
+        showActionToast(
+          messages.toastGroupJoined ?? messages.statusTexts.groupJoined
+        )
       }
     } catch (error) {
       applyError(error, messages.errors.groupFailed)
@@ -957,12 +1161,15 @@ export default function App() {
     messages.errors.profileRequired,
     messages.statusTexts.groupCreated,
     messages.statusTexts.groupJoined,
-    passphrase
+    messages.toastGroupCreated,
+    messages.toastGroupJoined,
+    passphrase,
+    showActionToast
   ])
 
   const handleEnablePush = useCallback(async () => {
     if (!session || !auth) return
-    if (!('serviceWorker' in navigator) || typeof Notification === 'undefined') {
+    if (pushCapability === 'unsupported') {
       setNotificationPermission('unsupported')
       return
     }
@@ -989,7 +1196,7 @@ export default function App() {
 
       await subscribePush(session.groupId, session.memberId, auth, subscription)
       lastSyncedMemberIdRef.current = session.memberId
-      setStatusText(messages.statusTexts.pushEnabled)
+      showActionToast(messages.toastPushEnabled ?? messages.statusTexts.pushEnabled)
       await loadPrivateData()
     } catch (error) {
       applyError(error, messages.errors.pushFailed)
@@ -1001,12 +1208,15 @@ export default function App() {
     messages.errors.pushFailed,
     messages.errors.vapidMissing,
     messages.statusTexts.pushEnabled,
-    session
+    messages.toastPushEnabled,
+    session,
+    pushCapability,
+    showActionToast
   ])
 
   const syncPushSubscription = useCallback(async () => {
     if (!session || !auth) return
-    if (!('serviceWorker' in navigator) || typeof Notification === 'undefined') return
+    if (pushCapability === 'unsupported') return
     if (notificationPermission !== 'granted') return
     if (lastSyncedMemberIdRef.current === session.memberId) return
 
@@ -1020,7 +1230,7 @@ export default function App() {
     } catch (error) {
       console.error('[push-sync] failed', error)
     }
-  }, [auth, loadPrivateData, notificationPermission, session])
+  }, [auth, loadPrivateData, notificationPermission, pushCapability, session])
 
   useEffect(() => {
     if (!session) return
@@ -1107,7 +1317,7 @@ export default function App() {
         itemIds,
         intent: requestIntent
       })
-      setStatusText(language === 'ja' ? result.pushMessage : messages.requestSentFallback)
+      showActionToast(result.pushMessage || messages.requestSentFallback)
       setCart({})
       setSelectedStoreId(undefined)
       setRequestIntent('buy')
@@ -1128,7 +1338,8 @@ export default function App() {
     messages.requestSentFallback,
     requestIntent,
     selectedStoreId,
-    session
+    session,
+    showActionToast
   ])
 
   const handleAck = useCallback(
@@ -1162,13 +1373,13 @@ export default function App() {
     try {
       const created = await createCustomTab(session.groupId, auth, { name: customTabName.trim() })
       setCustomTabName('')
-      setStatusText(messages.statusTexts.tabAdded(created.name))
+      showActionToast(messages.statusTexts.tabAdded(created.name))
       await loadPrivateData()
       setActiveTabId(created.id)
     } catch (error) {
       applyError(error, messages.errors.addTabFailed)
     }
-  }, [applyError, auth, customTabName, loadPrivateData, messages.errors.addTabFailed, messages.statusTexts, session])
+  }, [applyError, auth, customTabName, loadPrivateData, messages.errors.addTabFailed, messages.statusTexts, session, showActionToast])
 
   const handleCreateCustomItem = useCallback(async () => {
     if (!session || !auth || !customItemName.trim() || !customItemTabId) return
@@ -1178,7 +1389,7 @@ export default function App() {
         name: customItemName.trim()
       })
       setCustomItemName('')
-      setStatusText(messages.statusTexts.itemAdded(created.name))
+      showActionToast(messages.statusTexts.itemAdded(created.name))
       await loadPrivateData()
       setActiveTabId(customItemTabId)
     } catch (error) {
@@ -1192,7 +1403,8 @@ export default function App() {
     loadPrivateData,
     messages.errors.addItemFailed,
     messages.statusTexts,
-    session
+    session,
+    showActionToast
   ])
 
   const handleCreateCustomStore = useCallback(async () => {
@@ -1200,7 +1412,7 @@ export default function App() {
     try {
       const created = await createCustomStore(session.groupId, auth, { name: customStoreName.trim() })
       setCustomStoreName('')
-      setStatusText(
+      showActionToast(
         messages.statusTexts.storeAdded
           ? messages.statusTexts.storeAdded(created.name)
           : language === 'ja'
@@ -1221,7 +1433,8 @@ export default function App() {
     messages.errors.addItemFailed,
     messages.errors.addStoreFailed,
     messages.statusTexts,
-    session
+    session,
+    showActionToast
   ])
 
   const openDeleteModal = useCallback((kind: DeleteTargetKind, target: CatalogTab | CatalogItem | StoreButton) => {
@@ -1234,13 +1447,13 @@ export default function App() {
     try {
       if (deleteTarget.kind === 'tab') {
         await deleteCustomTab(session.groupId, deleteTarget.id, auth)
-        setStatusText(messages.statusTexts.tabDeleted(deleteTarget.name))
+        showActionToast(messages.statusTexts.tabDeleted(deleteTarget.name))
       } else if (deleteTarget.kind === 'item') {
         await deleteCustomItem(session.groupId, deleteTarget.id, auth)
-        setStatusText(messages.statusTexts.itemDeleted(deleteTarget.name))
+        showActionToast(messages.statusTexts.itemDeleted(deleteTarget.name))
       } else {
         await deleteCustomStore(session.groupId, deleteTarget.id, auth)
-        setStatusText(
+        showActionToast(
           messages.statusTexts.storeDeleted
             ? messages.statusTexts.storeDeleted(deleteTarget.name)
             : language === 'ja'
@@ -1279,18 +1492,19 @@ export default function App() {
     messages.errors.itemInUse,
     messages.errors.tabInUse,
     messages.statusTexts,
-    session
+    session,
+    showActionToast
   ])
 
   const handleCopyInviteLink = useCallback(async () => {
     if (!inviteLink) return
     try {
       await navigator.clipboard.writeText(inviteLink)
-      setStatusText(messages.statusTexts.inviteLinkCopied)
+      showActionToast(messages.toastInviteCopied ?? messages.statusTexts.inviteLinkCopied)
     } catch {
       setErrorText(messages.errors.clipboardFailed)
     }
-  }, [inviteLink, messages.errors.clipboardFailed, messages.statusTexts.inviteLinkCopied])
+  }, [inviteLink, messages.errors.clipboardFailed, messages.statusTexts.inviteLinkCopied, messages.toastInviteCopied, showActionToast])
 
   const activeItems = itemsByTab.get(activeTabId) ?? []
   const hasTouchData =
@@ -1462,7 +1676,7 @@ export default function App() {
           <button type="button" className="language-button" onClick={handleToggleLanguage}>
             {messages.languageSwitch}
           </button>
-          {notificationPermission !== 'unsupported' && (
+          {pushCapability === 'supported' && (
             <button type="button" onClick={handleEnablePush}>
               {notificationActionLabel}
             </button>
@@ -1482,6 +1696,7 @@ export default function App() {
               setInviteFromLink(false)
               setShowManualJoinInput(false)
               setLastLoadErrorCode('')
+              setActionToast('')
               lastSyncedMemberIdRef.current = null
             }}
           >
@@ -1490,9 +1705,59 @@ export default function App() {
         </div>
       </header>
 
+      {actionToast && (
+        <div className="action-toast" role="status" aria-live="polite">
+          {actionToast}
+        </div>
+      )}
+
       {quotaResumeAt && (
         <aside className="quota-banner">{messages.quotaPaused(formatTime(quotaResumeAt, messages.locale))}</aside>
       )}
+
+      <aside className="notification-guide" aria-live="polite">
+        <strong>{notifyGuideTitle}</strong>
+        <p>{pushCapability === 'unsupported' ? notifyGuideUnsupported : notifyGuideSummary}</p>
+        <p className="sub-text notify-guide-support">
+          {pushCapability === 'unsupported' ? pushSupportUnsupportedNote : pushSupportBestEffortNote}
+        </p>
+        <details>
+          <summary>{notifyGuideDetailsTitle}</summary>
+          <div className="notify-guide-grid">
+            <section>
+              <h3>iOS</h3>
+              <ul>
+                {notifyGuidePlatformIOS.map((step) => (
+                  <li key={`ios-${step}`}>{step}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>Android</h3>
+              <ul>
+                {notifyGuidePlatformAndroid.map((step) => (
+                  <li key={`android-${step}`}>{step}</li>
+                ))}
+              </ul>
+            </section>
+            <section>
+              <h3>PC</h3>
+              <ul>
+                {notifyGuidePlatformPC.map((step) => (
+                  <li key={`pc-${step}`}>{step}</li>
+                ))}
+              </ul>
+            </section>
+          </div>
+          <p className="sub-text notify-guide-note">{notifyGuidePlatformNote}</p>
+          <h4>{notifyGuideBehaviorTitle}</h4>
+          <ul>
+            {notifyGuideBehaviorPoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </details>
+      </aside>
 
       <aside className="retention-banner" aria-live="polite">
         <strong>{messages.retentionBannerTitle}</strong>
@@ -1860,7 +2125,7 @@ export default function App() {
           <h3>
             {messages.cartTitle} ({cartCount})
           </h3>
-          <p>{statusText}</p>
+          <p>{cartHint}</p>
         </div>
         {selectedStoreName && (
           <div className="cart-store-row">

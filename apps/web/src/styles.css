@@ -336,6 +336,86 @@ select {
   font-size: 0.9rem;
 }
 
+.action-toast {
+  margin-bottom: 0.9rem;
+  border: 1px solid #b7dfce;
+  background: #ecfbf4;
+  border-radius: 0.8rem;
+  padding: 0.62rem 0.85rem;
+  color: #0b6443;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.notification-guide {
+  margin-bottom: 0.9rem;
+  border: 1px solid #cde2ec;
+  background: #f7fcff;
+  border-radius: 0.8rem;
+  padding: 0.7rem 0.9rem;
+  color: #214557;
+  font-size: 0.9rem;
+}
+
+.notification-guide strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.notification-guide p {
+  margin: 0;
+}
+
+.notification-guide details {
+  margin-top: 0.45rem;
+}
+
+.notification-guide summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.notify-guide-grid {
+  margin-top: 0.45rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.6rem;
+}
+
+.notify-guide-grid section {
+  border: 1px solid #d9e8ef;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0.55rem 0.65rem;
+}
+
+.notify-guide-grid h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.92rem;
+}
+
+.notification-guide h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9rem;
+}
+
+.notification-guide ul {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.notification-guide li + li {
+  margin-top: 0.2rem;
+}
+
+.notify-guide-note {
+  margin-top: 0.45rem;
+}
+
+.notify-guide-support {
+  margin-top: 0.45rem;
+}
+
 .retention-banner {
   margin-bottom: 0.9rem;
   border: 1px solid #c8dce6;
