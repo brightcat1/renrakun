@@ -1134,20 +1134,19 @@ app.post('/api/requests/:requestId/ack', async (c) => {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
   }
 
-  const beforeStatus = await readRequestStatus(c, requestId)
   const activityAt = nowIso()
+  const transition = await c.env.DB.prepare(
+    `
+    UPDATE requests
+    SET status = 'acknowledged'
+    WHERE id = ? AND status = 'requested'
+    `
+  )
+    .bind(requestId)
+    .run()
+  const changed = Number(transition.meta?.changes ?? 0) === 1
 
   await c.env.DB.batch([
-    c.env.DB.prepare(
-      `
-      UPDATE requests
-      SET status = CASE
-        WHEN status = 'requested' THEN 'acknowledged'
-        ELSE status
-      END
-      WHERE id = ?
-      `
-    ).bind(requestId),
     c.env.DB.prepare(
       `
       UPDATE inbox_events
@@ -1176,9 +1175,10 @@ app.post('/api/requests/:requestId/ack', async (c) => {
       `
     ).bind(activityAt, activityAt, member.id)
   ])
+  logInfo(c.env, 'status.transition.changed', { action: 'acknowledged', requestId, changed })
 
   const status = await readRequestStatus(c, requestId)
-  if (beforeStatus !== status && status === 'acknowledged') {
+  if (changed && status === 'acknowledged') {
     const { storeName, itemsSummary } = await buildRequestSummary(c.env, requestId, language)
 
     await enqueuePushNotifications(c.env, {
@@ -1232,17 +1232,19 @@ app.post('/api/requests/:requestId/complete', async (c) => {
     throw new HTTPException(404, { message: 'REQUEST_NOT_FOUND' })
   }
 
-  const beforeStatus = await readRequestStatus(c, requestId)
   const activityAt = nowIso()
+  const transition = await c.env.DB.prepare(
+    `
+    UPDATE requests
+    SET status = 'completed'
+    WHERE id = ? AND status <> 'completed'
+    `
+  )
+    .bind(requestId)
+    .run()
+  const changed = Number(transition.meta?.changes ?? 0) === 1
 
   await c.env.DB.batch([
-    c.env.DB.prepare(
-      `
-      UPDATE requests
-      SET status = 'completed'
-      WHERE id = ?
-      `
-    ).bind(requestId),
     c.env.DB.prepare(
       `
       UPDATE inbox_events
@@ -1271,9 +1273,10 @@ app.post('/api/requests/:requestId/complete', async (c) => {
       `
     ).bind(activityAt, activityAt, member.id)
   ])
+  logInfo(c.env, 'status.transition.changed', { action: 'completed', requestId, changed })
 
   const status = await readRequestStatus(c, requestId)
-  if (beforeStatus !== status && status === 'completed') {
+  if (changed && status === 'completed') {
     const { storeName, itemsSummary } = await buildRequestSummary(c.env, requestId, language)
 
     await enqueuePushNotifications(c.env, {
