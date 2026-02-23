@@ -254,7 +254,7 @@ const MESSAGES: Record<Language, Messages> = {
     inviteLinkLabel: '招待リンク',
     copyInviteLink: '招待リンクをコピー',
     copyInviteToken: 'トークンをコピー',
-    inviteHybridHint: 'iOSでホーム画面アプリを使う場合は、招待リンクまたはトークンをコピーして「グループ参加」から参加してください。',
+    inviteHybridHint: '招待相手がiPhoneでホーム画面アプリを使う場合は、招待リンクまたはトークンを共有し、「グループ参加」で入力してもらってください。',
     membersTitle: '参加中メンバー',
     membersCount: (count) => `${count}人`,
     memberCreatorBadge: '作成者',
@@ -431,7 +431,7 @@ const MESSAGES: Record<Language, Messages> = {
     inviteLinkLabel: 'Invite link',
     copyInviteLink: 'Copy invite link',
     copyInviteToken: 'Copy token',
-    inviteHybridHint: 'For iOS Home Screen app usage, copy the invite link or token and join from "Join Group".',
+    inviteHybridHint: 'If the person you invite uses the iPhone Home Screen app, share the invite link or token and have them enter it in "Join Group".',
     membersTitle: 'Members in group',
     membersCount: (count) => `${count} members`,
     memberCreatorBadge: 'Creator',
@@ -987,8 +987,8 @@ export default function App() {
   const inviteHybridHint =
     messages.inviteHybridHint ||
     (language === 'ja'
-      ? 'iOSでホーム画面アプリを使う場合は、招待リンクまたはトークンをコピーして「グループ参加」から参加してください。'
-      : 'For iOS Home Screen app usage, copy the invite link or token and join from "Join Group".')
+      ? '招待相手がiPhoneでホーム画面アプリを使う場合は、招待リンクまたはトークンを共有し、「グループ参加」で入力してもらってください。'
+      : 'If the person you invite uses the iPhone Home Screen app, share the invite link or token and have them enter it in "Join Group".')
   const iosInviteContextTitle =
     messages.iosInviteContextTitle || (language === 'ja' ? 'iPhoneで参加する場合' : 'When joining on iPhone')
   const iosInviteContextBody =
@@ -1629,8 +1629,8 @@ export default function App() {
           {isIosBrowser && (
             <p className="sub-text onboarding-platform-note">
               {language === 'ja'
-                ? 'iPhoneで使う場合は、ホーム画面に追加したアプリ側で参加・利用してください。'
-                : 'On iPhone, join and use renrakun from the Home Screen app.'}
+                ? 'iPhoneでプッシュ通知を使う場合は、先に「ホーム画面に追加」したアプリ側から参加・利用してください。'
+                : 'To use push notifications on iPhone, add renrakun to Home Screen first, then join/use it from that app.'}
             </p>
           )}
         </header>
@@ -1886,7 +1886,7 @@ export default function App() {
               </button>
             )}
           </div>
-          <p className="sub-text invite-hybrid-hint">{inviteHybridHint}</p>
+          {isIosBrowser && <p className="sub-text invite-hybrid-hint">{inviteHybridHint}</p>}
         </section>
       )}
 
