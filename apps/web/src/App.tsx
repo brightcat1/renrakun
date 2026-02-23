@@ -1886,7 +1886,7 @@ export default function App() {
               </button>
             )}
           </div>
-          {isIosBrowser && <p className="sub-text invite-hybrid-hint">{inviteHybridHint}</p>}
+          <p className="sub-text invite-hybrid-hint">{inviteHybridHint}</p>
         </section>
       )}
 
