@@ -6,7 +6,7 @@ It keeps "Need to buy / Want to visit" requests out of daily chat noise with a d
 ## MVP Features
 
 - Touch-panel UI for fast request creation
-- Group join via invite link + passphrase (no account registration)
+- Group join via invite link + passphrase (with token-based manual join available for iOS Home Screen app use)
 - Request status flow: `Requested` / `In progress` / `Completed`
 - Lock-screen push summaries (who + what)
 - Always-on in-app notification setup guide after login (iOS / Android / PC)
@@ -134,6 +134,7 @@ If push is not arriving, check in this order:
    - iOS: open in Safari, add to Home Screen, then enable notifications from the Home Screen web app (required)
    - Android/PC: allow browser notifications, then use `Enable notifications/Resync notifications` in the app
    - PC notifications are best-effort. Mobile is most reliable (on iOS, Home Screen web app is required).
+   - If you plan to use the iOS Home Screen app, Safari-joined session state may not carry over. Share/copy the token and join from `Join Group` inside the Home Screen app when needed.
 1. Tap `Resync notifications` in the app
 2. Check member push state in `Members in group`
 3. Verify migration status (`--local` / `--remote`)

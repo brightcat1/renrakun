@@ -91,6 +91,10 @@ body {
   color: var(--muted);
 }
 
+.onboarding-platform-note {
+  margin-top: 0.5rem;
+}
+
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -201,6 +205,43 @@ body {
 
 .invite-card button:empty {
   display: none;
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.invite-actions button {
+  margin-top: 0;
+}
+
+.invite-hybrid-hint {
+  margin-top: 0.45rem;
+}
+
+.ios-invite-context {
+  margin-top: 0.35rem;
+  border: 1px solid #d7e5ea;
+  background: #f7fbff;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+}
+
+.ios-invite-context strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.ios-invite-context p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ios-invite-context .inline-text-button {
+  margin-top: 0.4rem;
 }
 
 .inline-text-button {

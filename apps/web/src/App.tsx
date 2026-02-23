@@ -72,6 +72,8 @@ interface Messages {
   inviteEntryTitle: string
   inviteEntryLead: string
   switchToManualJoin: string
+  iosInviteContextTitle?: string
+  iosInviteContextBody?: string
   createAction: string
   joinAction: string
   fixedCatalog: string
@@ -88,6 +90,8 @@ interface Messages {
   retentionBannerDetailsPoints: string[]
   inviteLinkLabel: string
   copyInviteLink: string
+  copyInviteToken?: string
+  inviteHybridHint?: string
   membersTitle?: string
   membersCount?: (count: number) => string
   memberCreatorBadge?: string
@@ -226,6 +230,9 @@ const MESSAGES: Record<Language, Messages> = {
     inviteEntryTitle: '招待リンクから参加',
     inviteEntryLead: '表示名と合言葉を入力すると、このグループに参加できます。',
     switchToManualJoin: '手動でトークン入力に切り替える',
+    iosInviteContextTitle: 'iPhoneで参加する場合',
+    iosInviteContextBody:
+      'Safariで開いた招待リンクから参加すると、ホーム画面アプリ側に参加状態が引き継がれないことがあります。ホーム画面アプリで使う場合は、下の「トークンをコピー」を使って「グループ参加」に貼り付けてください。',
     createAction: 'グループを作る',
     joinAction: 'グループに参加する',
     fixedCatalog: '固定カタログ',
@@ -246,6 +253,8 @@ const MESSAGES: Record<Language, Messages> = {
     ],
     inviteLinkLabel: '招待リンク',
     copyInviteLink: '招待リンクをコピー',
+    copyInviteToken: 'トークンをコピー',
+    inviteHybridHint: 'iOSでホーム画面アプリを使う場合は、トークン共有が確実です。',
     membersTitle: '参加中メンバー',
     membersCount: (count) => `${count}人`,
     memberCreatorBadge: '作成者',
@@ -398,6 +407,9 @@ const MESSAGES: Record<Language, Messages> = {
     inviteEntryTitle: 'Join from invite link',
     inviteEntryLead: 'Enter your display name and passphrase to join this group.',
     switchToManualJoin: 'Switch to manual token input',
+    iosInviteContextTitle: 'When joining on iPhone',
+    iosInviteContextBody:
+      'If you join from a Safari invite link, that session may not carry over to your Home Screen app. If you use the Home Screen app, copy the token below and paste it into "Join Group".',
     createAction: 'Create group',
     joinAction: 'Join group',
     fixedCatalog: 'Built-in catalog',
@@ -418,6 +430,8 @@ const MESSAGES: Record<Language, Messages> = {
     ],
     inviteLinkLabel: 'Invite link',
     copyInviteLink: 'Copy invite link',
+    copyInviteToken: 'Copy token',
+    inviteHybridHint: 'For iOS Home Screen app usage, token sharing is the most reliable path.',
     membersTitle: 'Members in group',
     membersCount: (count) => `${count} members`,
     memberCreatorBadge: 'Creator',
@@ -612,6 +626,21 @@ function buildInviteUrl(token: string): string {
   return `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(token)}`
 }
 
+function isIosBrowserEnv(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const platform = navigator.platform || ''
+  const maxTouchPoints = navigator.maxTouchPoints || 0
+  return /iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1)
+}
+
+function isStandaloneEnv(): boolean {
+  if (typeof window === 'undefined') return false
+  const navStandalone = Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  const mediaStandalone = typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches
+  return navStandalone || mediaStandalone
+}
+
 function isQuotaError(error: unknown): error is ApiClientError {
   return error instanceof ApiClientError && error.code === 'SERVICE_PAUSED_DAILY_QUOTA'
 }
@@ -674,6 +703,8 @@ export default function App() {
       window.isSecureContext
     return supportsPush ? 'supported' : 'unsupported'
   }, [])
+  const isIosBrowser = useMemo(() => isIosBrowserEnv(), [])
+  const isStandalone = useMemo(() => isStandaloneEnv(), [])
 
   useEffect(() => {
     setApiLanguage(language)
@@ -950,7 +981,21 @@ export default function App() {
     [session?.inviteToken]
   )
   const showInviteOnlyJoin = inviteFromLink && !showManualJoinInput
+  const shouldShowIosInviteNotice = !session && showInviteOnlyJoin && isIosBrowser && !isStandalone
   const inviteCopyLabel = messages.copyInviteLink || (language === 'ja' ? '招待リンクをコピー' : 'Copy invite link')
+  const inviteTokenCopyLabel = messages.copyInviteToken || (language === 'ja' ? 'トークンをコピー' : 'Copy token')
+  const inviteHybridHint =
+    messages.inviteHybridHint ||
+    (language === 'ja'
+      ? 'iOSでホーム画面アプリを使う場合は、トークン共有が確実です。'
+      : 'For iOS Home Screen app usage, token sharing is the most reliable path.')
+  const iosInviteContextTitle =
+    messages.iosInviteContextTitle || (language === 'ja' ? 'iPhoneで参加する場合' : 'When joining on iPhone')
+  const iosInviteContextBody =
+    messages.iosInviteContextBody ||
+    (language === 'ja'
+      ? 'Safariで開いた招待リンクから参加すると、ホーム画面アプリ側に参加状態が引き継がれないことがあります。ホーム画面アプリで使う場合は、下の「トークンをコピー」を使って「グループ参加」に貼り付けてください。'
+      : 'If you join from a Safari invite link, that session may not carry over to your Home Screen app. If you use the Home Screen app, copy the token below and paste it into "Join Group".')
   const notificationActionLabel =
     notificationPermission === 'granted'
       ? messages.resyncNotifications || (language === 'ja' ? '通知を再同期' : 'Resync notifications')
@@ -1135,7 +1180,6 @@ export default function App() {
           setErrorText(messages.errors.inviteRequired)
           return
         }
-        setInviteToken(normalizedInvite)
         const result = await joinGroup({
           deviceId,
           displayName,
@@ -1542,6 +1586,21 @@ export default function App() {
     }
   }, [inviteLink, messages.errors.clipboardFailed, messages.statusTexts.inviteLinkCopied, messages.toastInviteCopied, showActionToast])
 
+  const handleCopyInviteToken = useCallback(
+    async (rawValue: string | undefined) => {
+      if (!rawValue) return
+      const token = normalizeInviteInput(rawValue)
+      if (!token) return
+      try {
+        await navigator.clipboard.writeText(token)
+        showActionToast(language === 'ja' ? '招待トークンをコピーしました。' : 'Invite token copied.')
+      } catch {
+        setErrorText(messages.errors.clipboardFailed)
+      }
+    },
+    [language, messages.errors.clipboardFailed, showActionToast]
+  )
+
   const activeItems = itemsByTab.get(activeTabId) ?? []
   const hasTouchData =
     tabs.length > 0 || storeButtons.length > 0 || (((layout ?? catalog)?.items?.length ?? 0) > 0)
@@ -1567,6 +1626,11 @@ export default function App() {
           <p className="hero-kicker">{messages.heroKicker}</p>
           <h1>{messages.appTitle}</h1>
           <p>{messages.onboardingLead}</p>
+          <p className="sub-text onboarding-platform-note">
+            {language === 'ja'
+              ? 'iOSで通知を使う場合は、Safariで開いて「ホーム画面に追加」したアプリから利用してください。Android/PCはブラウザ通知を許可して、アプリ内「通知を有効化/再同期」を押してください。'
+              : 'For iOS notifications, use the Home Screen web app opened from Safari. On Android/PC, allow browser notifications and then tap "Enable notifications/Resync notifications" in the app.'}
+          </p>
         </header>
 
         <section className="card onboarding-card">
@@ -1574,6 +1638,19 @@ export default function App() {
             <>
               <h2>{messages.inviteEntryTitle}</h2>
               <p className="sub-text">{messages.inviteEntryLead}</p>
+              {shouldShowIosInviteNotice && (
+                <aside className="ios-invite-context">
+                  <strong>{iosInviteContextTitle}</strong>
+                  <p>{iosInviteContextBody}</p>
+                  <button
+                    type="button"
+                    className="inline-text-button"
+                    onClick={() => void handleCopyInviteToken(inviteToken)}
+                  >
+                    {inviteTokenCopyLabel}
+                  </button>
+                </aside>
+              )}
 
               <label>
                 {messages.displayName}
@@ -1797,9 +1874,17 @@ export default function App() {
           <p>
             {messages.inviteLinkLabel}: <code>{inviteLink}</code>
           </p>
-          <button type="button" onClick={handleCopyInviteLink}>
-            {inviteCopyLabel}
-          </button>
+          <div className="invite-actions">
+            <button type="button" onClick={handleCopyInviteLink}>
+              {inviteCopyLabel}
+            </button>
+            {session.inviteToken && (
+              <button type="button" onClick={() => void handleCopyInviteToken(session.inviteToken)}>
+                {inviteTokenCopyLabel}
+              </button>
+            )}
+          </div>
+          <p className="sub-text invite-hybrid-hint">{inviteHybridHint}</p>
         </section>
       )}
 
