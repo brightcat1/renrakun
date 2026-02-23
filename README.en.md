@@ -134,7 +134,7 @@ If push is not arriving, check in this order:
    - iOS: open in Safari, add to Home Screen, then enable notifications from the Home Screen web app (required)
    - Android/PC: allow browser notifications, then use `Enable notifications/Resync notifications` in the app
    - PC notifications are best-effort. Mobile is most reliable (on iOS, Home Screen web app is required).
-   - If you plan to use the iOS Home Screen app, Safari-joined session state may not carry over. Share/copy the token and join from `Join Group` inside the Home Screen app when needed.
+   - If you plan to use the iOS Home Screen app, Safari and the Home Screen app are handled separately. Share/copy the invite link or token and join from `Join Group` inside the Home Screen app.
 1. Tap `Resync notifications` in the app
 2. Check member push state in `Members in group`
 3. Verify migration status (`--local` / `--remote`)

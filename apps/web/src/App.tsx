@@ -232,7 +232,7 @@ const MESSAGES: Record<Language, Messages> = {
     switchToManualJoin: '手動でトークン入力に切り替える',
     iosInviteContextTitle: 'iPhoneで参加する場合',
     iosInviteContextBody:
-      'Safariで開いた招待リンクから参加すると、ホーム画面アプリ側に参加状態が引き継がれないことがあります。ホーム画面アプリで使う場合は、下の「トークンをコピー」を使って「グループ参加」に貼り付けてください。',
+      'Safariで開いた画面とホーム画面アプリは別扱いです。ホーム画面アプリで使う場合は、招待リンクまたはトークンをコピーして「グループ参加」に貼り付けてください。',
     createAction: 'グループを作る',
     joinAction: 'グループに参加する',
     fixedCatalog: '固定カタログ',
@@ -254,7 +254,7 @@ const MESSAGES: Record<Language, Messages> = {
     inviteLinkLabel: '招待リンク',
     copyInviteLink: '招待リンクをコピー',
     copyInviteToken: 'トークンをコピー',
-    inviteHybridHint: 'iOSでホーム画面アプリを使う場合は、トークン共有が確実です。',
+    inviteHybridHint: 'iOSでホーム画面アプリを使う場合は、招待リンクまたはトークンをコピーして「グループ参加」から参加してください。',
     membersTitle: '参加中メンバー',
     membersCount: (count) => `${count}人`,
     memberCreatorBadge: '作成者',
@@ -409,7 +409,7 @@ const MESSAGES: Record<Language, Messages> = {
     switchToManualJoin: 'Switch to manual token input',
     iosInviteContextTitle: 'When joining on iPhone',
     iosInviteContextBody:
-      'If you join from a Safari invite link, that session may not carry over to your Home Screen app. If you use the Home Screen app, copy the token below and paste it into "Join Group".',
+      'Safari and the Home Screen app are handled separately. If you use the Home Screen app, copy the invite link or token and paste it into "Join Group".',
     createAction: 'Create group',
     joinAction: 'Join group',
     fixedCatalog: 'Built-in catalog',
@@ -431,7 +431,7 @@ const MESSAGES: Record<Language, Messages> = {
     inviteLinkLabel: 'Invite link',
     copyInviteLink: 'Copy invite link',
     copyInviteToken: 'Copy token',
-    inviteHybridHint: 'For iOS Home Screen app usage, token sharing is the most reliable path.',
+    inviteHybridHint: 'For iOS Home Screen app usage, copy the invite link or token and join from "Join Group".',
     membersTitle: 'Members in group',
     membersCount: (count) => `${count} members`,
     memberCreatorBadge: 'Creator',
@@ -987,15 +987,15 @@ export default function App() {
   const inviteHybridHint =
     messages.inviteHybridHint ||
     (language === 'ja'
-      ? 'iOSでホーム画面アプリを使う場合は、トークン共有が確実です。'
-      : 'For iOS Home Screen app usage, token sharing is the most reliable path.')
+      ? 'iOSでホーム画面アプリを使う場合は、招待リンクまたはトークンをコピーして「グループ参加」から参加してください。'
+      : 'For iOS Home Screen app usage, copy the invite link or token and join from "Join Group".')
   const iosInviteContextTitle =
     messages.iosInviteContextTitle || (language === 'ja' ? 'iPhoneで参加する場合' : 'When joining on iPhone')
   const iosInviteContextBody =
     messages.iosInviteContextBody ||
     (language === 'ja'
-      ? 'Safariで開いた招待リンクから参加すると、ホーム画面アプリ側に参加状態が引き継がれないことがあります。ホーム画面アプリで使う場合は、下の「トークンをコピー」を使って「グループ参加」に貼り付けてください。'
-      : 'If you join from a Safari invite link, that session may not carry over to your Home Screen app. If you use the Home Screen app, copy the token below and paste it into "Join Group".')
+      ? 'Safariで開いた画面とホーム画面アプリは別扱いです。ホーム画面アプリで使う場合は、招待リンクまたはトークンをコピーして「グループ参加」に貼り付けてください。'
+      : 'Safari and the Home Screen app are handled separately. If you use the Home Screen app, copy the invite link or token and paste it into "Join Group".')
   const notificationActionLabel =
     notificationPermission === 'granted'
       ? messages.resyncNotifications || (language === 'ja' ? '通知を再同期' : 'Resync notifications')
@@ -1626,11 +1626,13 @@ export default function App() {
           <p className="hero-kicker">{messages.heroKicker}</p>
           <h1>{messages.appTitle}</h1>
           <p>{messages.onboardingLead}</p>
-          <p className="sub-text onboarding-platform-note">
-            {language === 'ja'
-              ? 'iOSで通知を使う場合は、Safariで開いて「ホーム画面に追加」したアプリから利用してください。Android/PCはブラウザ通知を許可して、アプリ内「通知を有効化/再同期」を押してください。'
-              : 'For iOS notifications, use the Home Screen web app opened from Safari. On Android/PC, allow browser notifications and then tap "Enable notifications/Resync notifications" in the app.'}
-          </p>
+          {isIosBrowser && (
+            <p className="sub-text onboarding-platform-note">
+              {language === 'ja'
+                ? 'iPhoneで使う場合は、ホーム画面に追加したアプリ側で参加・利用してください。'
+                : 'On iPhone, join and use renrakun from the Home Screen app.'}
+            </p>
+          )}
         </header>
 
         <section className="card onboarding-card">
