@@ -1,15 +1,32 @@
-﻿# renrakun (れんらくん)
+﻿## ⚠️ プロジェクトのステータス / Project Status: Archived
+
+**本プロジェクトは現在アーカイブ（開発および運用を恒久的に終了）されています。**
+**This repository is kept for archival purposes as a demonstration of software engineering practices.**
+
+- **運用の停止 (Status)**: Cloudflare上でのサービス提供（`renrakun.pages.dev` およびAPI）は恒久的に終了しており、Cloudflareのデプロイ（Workers/Pages/D1）は削除済みのため、現在アクセスできません。
+  *(The live site and API services on Cloudflare, including `renrakun.pages.dev`, have been permanently discontinued. The Cloudflare deployments (Workers/Pages/D1) have been removed, and the service is no longer accessible.)*
+- **補足 (Note)**: 本プロジェクトは限定的な検証目的でのみ利用しました。
+  *(This project was only used for limited testing purposes.)*
+- **目的 (Purpose)**: 本リポジトリは、個人開発のポートフォリオ（設計・実装の記録）として公開しています。
+  *(This codebase serves as a portfolio piece showing the implementation of a full-stack application.)*
+- **免責事項 (Disclaimer)**: 本コードは現状有姿で提供され、明示または黙示を問わず一切の保証を行いません。法令で許容される範囲で、本コードの利用に起因するいかなる損害についても作者は責任を負いません。
+  *(Provided "as is", without warranty of any kind, express or implied. To the fullest extent permitted by law, the author is not liable for any damages arising from its use.)*
+
+---
+
+# renrakun (れんらくん)
 
 Tap-first household request app.
 
 家庭内の「買ってほしい / 行きたい」依頼を、専用タッチパネルでサッと共有できます。
 会員登録なしで、すばやく共有できるPWAです。
 
-- **App URL:** [renrakun.pages.dev](https://renrakun.pages.dev)
 - **日本語ドキュメント:** [README.ja.md](README.ja.md)
 - **English documentation:** [README.en.md](README.en.md)
 
 ## Feature Gallery / 特徴ギャラリー
+
+*(※ スクリーンショット内の表示名および依頼内容はデモ用のサンプルデータです / Display names and contents in screenshots are sample data.)*
 
 ### No email signup required (display name + group passphrase) / メール登録不要（表示名 + 合言葉で利用可能）
 Display name + passphrase only. Invite link sharing is built-in.

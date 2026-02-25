@@ -1,3 +1,14 @@
+## ⚠️ Project Status: Archived
+
+This repository is kept for **archival purposes** as a demonstration of software engineering practices.
+
+- **Status**: The live site and API services on Cloudflare (including `renrakun.pages.dev`) have been permanently discontinued, and the Cloudflare deployments (Workers/Pages/D1) have been removed; the service is no longer accessible.
+- **Note**: This project was only used for limited testing purposes.
+- **Purpose**: This codebase serves as a portfolio piece showing the implementation of a full-stack application using Cloudflare Workers, Hono, and D1.
+- **Disclaimer**: Provided "as is", without warranty of any kind, express or implied. To the fullest extent permitted by law, the author is not liable for any damages arising from its use.
+
+---
+
 # renrakun
 
 `renrakun` is a household request messenger PWA built for tap-only interactions.  
@@ -114,6 +125,8 @@ pnpm dev:web
 ```
 
 ## Production Setup
+
+*(Archived: the following sections are kept for reference only and are not actively maintained.)*
 
 1. Apply remote migrations (initial + schema updates)
 
